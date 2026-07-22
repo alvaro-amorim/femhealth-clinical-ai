@@ -27,21 +27,27 @@ Contrato principal:
 
 ## Separacao dos dados
 
-O WDBC e separado de forma estratificada em 80% para desenvolvimento e 20% para
-teste final. O conjunto de desenvolvimento sera usado futuramente para comparar
-abordagens e ajustar decisoes metodologicas. O teste final deve permanecer
-preservado para avaliacao apos a selecao.
-
-Nenhum treinamento foi implementado ainda.
+O WDBC é separado de forma estratificada em 80% para desenvolvimento e 20% para
+teste final. O conjunto de desenvolvimento é usado para comparação baseline. O
+teste final permanece intocado para avaliação posterior.
 
 ## Modelos candidatos
 
-Os candidatos planejados sao Regressao Logistica, KNN, Arvore de Decisao,
-Random Forest e SVM. Regressao Logistica, KNN e SVM usam `StandardScaler`
-dentro do pipeline para evitar vazamento de dados em validacoes futuras.
-Arvore de Decisao e Random Forest nao usam padronizacao.
+Os candidatos planejados são Regressão Logística, KNN, Árvore de Decisão,
+Random Forest e SVM. Regressão Logística, KNN e SVM usam `StandardScaler`
+dentro do pipeline para evitar vazamento de dados em validações futuras.
+Árvore de Decisão e Random Forest não usam padronização.
 
-Nenhum modelo foi treinado ou selecionado ainda.
+## Benchmark baseline
+
+O benchmark baseline já foi executado com validação cruzada estratificada de 5
+folds usando somente o conjunto de desenvolvimento. Os cinco modelos foram
+treinados temporariamente dentro dos folds para estimar métricas de comparação:
+accuracy, balanced accuracy, precision, recall e F1 para a classe maligna,
+specificity para benignos, ROC AUC e average precision.
+
+Nenhum modelo final foi selecionado ou persistido. O conjunto de teste final
+continua intocado.
 
 Este projeto requer Python 3.11.
 
