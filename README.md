@@ -59,6 +59,17 @@ KNN e Árvore de Decisão permanecem documentados no benchmark, mas não são
 ajustados nesta etapa. O teste final segue intocado, e nenhum modelo final foi
 selecionado ou persistido.
 
+## Probabilidades e thresholds
+
+Os melhores hiperparâmetros ajustados foram reutilizados para gerar
+probabilidades out-of-fold somente no conjunto de desenvolvimento. Foram
+comparadas probabilidades nativas e calibradas por sigmoid, com thresholds de
+0.05 a 0.95.
+
+A análise usa recall maligno mínimo de 0.97 como restrição acadêmica para
+thresholds provisórios. Esses pontos não são recomendações clínicas. O teste
+final permanece intocado, e nenhum modelo final foi selecionado ou persistido.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
