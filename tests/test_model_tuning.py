@@ -15,8 +15,10 @@ from femhealth.model_evaluation import (
 from femhealth.model_tuning import (
     REFIT_METRIC,
     TUNED_CANDIDATES,
+    TUNED_PARAMETERS,
     build_grid_searches,
     build_parameter_grids,
+    build_tuned_candidate_pipelines,
     tune_selected_candidates,
 )
 
@@ -91,6 +93,51 @@ def tuned_results(
 
 def test_tuned_candidates_are_exactly_selected_models() -> None:
     assert TUNED_CANDIDATES == ("logistic_regression", "random_forest", "svm")
+
+
+def test_tuned_parameters_match_selected_round_results() -> None:
+    assert TUNED_PARAMETERS == {
+        "logistic_regression": {
+            "model__C": 0.1,
+            "model__class_weight": "balanced",
+            "model__l1_ratio": 1.0,
+            "model__solver": "liblinear",
+        },
+        "random_forest": {
+            "model__class_weight": "balanced",
+            "model__max_depth": None,
+            "model__max_features": "sqrt",
+            "model__min_samples_leaf": 1,
+            "model__n_estimators": 200,
+        },
+        "svm": {
+            "model__C": 1.0,
+            "model__class_weight": "balanced",
+            "model__gamma": "scale",
+            "model__kernel": "rbf",
+        },
+    }
+
+
+def test_build_tuned_candidate_pipelines_applies_parameters() -> None:
+    pipelines = build_tuned_candidate_pipelines()
+
+    assert tuple(pipelines) == TUNED_CANDIDATES
+    for candidate, parameters in TUNED_PARAMETERS.items():
+        pipeline_parameters = pipelines[candidate].get_params()
+        assert all(pipeline_parameters[name] == value for name, value in parameters.items())
+
+
+def test_build_tuned_candidate_pipelines_returns_independent_unfitted_objects() -> None:
+    first_pipelines = build_tuned_candidate_pipelines()
+    second_pipelines = build_tuned_candidate_pipelines()
+
+    for candidate in TUNED_CANDIDATES:
+        assert first_pipelines[candidate] is not second_pipelines[candidate]
+        assert first_pipelines[candidate].named_steps["model"] is not (
+            second_pipelines[candidate].named_steps["model"]
+        )
+        assert not hasattr(first_pipelines[candidate].named_steps["model"], "classes_")
 
 
 def test_parameter_grids_use_only_model_prefixed_parameters() -> None:

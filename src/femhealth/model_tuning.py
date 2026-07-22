@@ -19,6 +19,27 @@ TUNED_CANDIDATES = (
     "svm",
 )
 REFIT_METRIC = "recall_malignant"
+TUNED_PARAMETERS = {
+    "logistic_regression": {
+        "model__C": 0.1,
+        "model__class_weight": "balanced",
+        "model__l1_ratio": 1.0,
+        "model__solver": "liblinear",
+    },
+    "random_forest": {
+        "model__class_weight": "balanced",
+        "model__max_depth": None,
+        "model__max_features": "sqrt",
+        "model__min_samples_leaf": 1,
+        "model__n_estimators": 200,
+    },
+    "svm": {
+        "model__C": 1.0,
+        "model__class_weight": "balanced",
+        "model__gamma": "scale",
+        "model__kernel": "rbf",
+    },
+}
 
 ParameterGrid = dict[str, list[object]]
 ParameterGrids = dict[str, ParameterGrid | list[ParameterGrid]]
@@ -72,6 +93,16 @@ def build_grid_searches(parameter_grids: ParameterGrids | None = None) -> dict[s
             error_score="raise",
             return_train_score=False,
         )
+        for candidate in TUNED_CANDIDATES
+    }
+
+
+def build_tuned_candidate_pipelines():
+    """Build fresh untuned-state pipelines with selected hyperparameters applied."""
+    pipelines = build_candidate_pipelines()
+
+    return {
+        candidate: pipelines[candidate].set_params(**TUNED_PARAMETERS[candidate])
         for candidate in TUNED_CANDIDATES
     }
 
