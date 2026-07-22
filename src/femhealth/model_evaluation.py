@@ -82,10 +82,10 @@ def evaluate_baseline_candidates(
     y_development: pd.Series,
 ) -> pd.DataFrame:
     """Evaluate candidate pipelines with stratified cross-validation."""
-    _validate_development_data(X_development, y_development)
+    validate_development_data(X_development, y_development)
 
     pipelines = build_candidate_pipelines()
-    scorers = _build_scorers()
+    scorers = build_evaluation_scorers()
     rows = []
 
     for model_name, pipeline in pipelines.items():
@@ -117,7 +117,7 @@ def evaluate_baseline_candidates(
     return pd.DataFrame(rows)
 
 
-def _validate_development_data(X: pd.DataFrame, y: pd.Series) -> None:
+def validate_development_data(X: pd.DataFrame, y: pd.Series) -> None:
     if not isinstance(X, pd.DataFrame):
         raise ValueError("X must be a DataFrame")
 
@@ -146,7 +146,7 @@ def _validate_development_data(X: pd.DataFrame, y: pd.Series) -> None:
         raise ValueError("Unexpected target classes")
 
 
-def _build_scorers() -> dict[str, str | object]:
+def build_evaluation_scorers() -> dict[str, str | object]:
     return {
         "accuracy": "accuracy",
         "balanced_accuracy": make_scorer(balanced_accuracy_score),

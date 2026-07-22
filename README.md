@@ -49,6 +49,16 @@ specificity para benignos, ROC AUC e average precision.
 Nenhum modelo final foi selecionado ou persistido. O conjunto de teste final
 continua intocado.
 
+## Ajuste de hiperparâmetros
+
+Regressão Logística, Random Forest e SVM foram ajustados com `GridSearchCV`,
+validação cruzada estratificada de 5 folds e `recall_malignant` como métrica
+principal de refit. As demais métricas do benchmark também são avaliadas.
+
+KNN e Árvore de Decisão permanecem documentados no benchmark, mas não são
+ajustados nesta etapa. O teste final segue intocado, e nenhum modelo final foi
+selecionado ou persistido.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
