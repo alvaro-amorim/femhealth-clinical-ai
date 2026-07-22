@@ -34,6 +34,15 @@ preservado para avaliacao apos a selecao.
 
 Nenhum treinamento foi implementado ainda.
 
+## Modelos candidatos
+
+Os candidatos planejados sao Regressao Logistica, KNN, Arvore de Decisao,
+Random Forest e SVM. Regressao Logistica, KNN e SVM usam `StandardScaler`
+dentro do pipeline para evitar vazamento de dados em validacoes futuras.
+Arvore de Decisao e Random Forest nao usam padronizacao.
+
+Nenhum modelo foi treinado ou selecionado ainda.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
