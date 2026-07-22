@@ -25,6 +25,15 @@ Contrato principal:
 - nenhuma variavel ausente;
 - ordem canonica das 30 features preservada.
 
+## Separacao dos dados
+
+O WDBC e separado de forma estratificada em 80% para desenvolvimento e 20% para
+teste final. O conjunto de desenvolvimento sera usado futuramente para comparar
+abordagens e ajustar decisoes metodologicas. O teste final deve permanecer
+preservado para avaliacao apos a selecao.
+
+Nenhum treinamento foi implementado ainda.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
