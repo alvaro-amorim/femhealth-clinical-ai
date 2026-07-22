@@ -8,13 +8,22 @@ version = "0.1.0"
 description = "Academic foundation for FemHealth ML Triage."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "pandas",
+    "scikit-learn",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-cov",
     "ruff",
+]
+analysis = [
+    "jupyterlab",
+    "ipykernel",
+    "matplotlib",
+    "seaborn",
 ]
 
 [tool.setuptools.packages.find]
