@@ -105,6 +105,32 @@ maligno alto com especificidade benigna também alta. Nenhuma decisão de modelo
 calibração ou threshold foi alterada após abrir o holdout. O projeto não possui
 validade clínica.
 
+## Artefato do modelo
+
+O estimador final é treinado apenas nos 455 registros de desenvolvimento. Os
+114 registros do holdout não entram no treinamento.
+
+O artefato será gerado por:
+
+```powershell
+.\.venv\Scripts\python.exe -m femhealth.model_artifact
+```
+
+Arquivos esperados:
+
+- `artifacts/model/femhealth_svm_sigmoid.joblib`;
+- `artifacts/model/femhealth_svm_sigmoid.metadata.json`.
+
+Os metadados registram o contrato de 30 features na ordem canônica, threshold
+0.51, classes, divisão dos dados, métricas finais já salvas e SHA-256 do Joblib.
+O carregamento validado recalcula o hash antes de carregar o estimador.
+
+O artefato foi gerado com Scikit-learn 1.9.0 e deve ser carregado com essa mesma versão.
+
+Arquivos Joblib devem ser carregados somente de fonte confiável. API e
+Streamlit deverão usar esse artefato sem retreinamento. O modelo permanece
+acadêmico e não possui validade clínica.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
