@@ -9,8 +9,9 @@ description = "Academic foundation for FemHealth ML Triage."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "joblib",
     "pandas",
-    "scikit-learn",
+    "scikit-learn==1.9.0",
 ]
 
 [project.optional-dependencies]
