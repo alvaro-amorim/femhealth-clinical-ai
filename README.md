@@ -7,9 +7,9 @@ O objetivo geral e criar, em etapas futuras, um fluxo reprodutivel que va de um
 notebook de treinamento para um modelo serializado em Joblib, consumido por uma API
 FastAPI e apresentado em uma interface Streamlit.
 
-Estado atual: fundacao inicial do projeto com carregamento e contrato inicial do
-dataset WDBC, alem de configuracao de pacote, qualidade de codigo, testes e
-integracao continua.
+Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
+selecionado, avaliação final do holdout concluída e resultados registrados. O
+modelo ainda não foi persistido.
 
 ## Dataset
 
@@ -28,8 +28,8 @@ Contrato principal:
 ## Separacao dos dados
 
 O WDBC é separado de forma estratificada em 80% para desenvolvimento e 20% para
-teste final. O conjunto de desenvolvimento é usado para comparação baseline. O
-teste final permanece intocado para avaliação posterior.
+teste final. O conjunto de desenvolvimento foi usado para comparação baseline,
+ajuste e seleção. O teste final foi reservado até a avaliação final congelada.
 
 ## Modelos candidatos
 
@@ -46,18 +46,18 @@ treinados temporariamente dentro dos folds para estimar métricas de comparaçã
 accuracy, balanced accuracy, precision, recall e F1 para a classe maligna,
 specificity para benignos, ROC AUC e average precision.
 
-Nenhum modelo final foi selecionado ou persistido. O conjunto de teste final
-continua intocado.
+Naquela etapa, nenhum modelo final havia sido selecionado ou persistido, e o
+conjunto de teste final permanecia intocado.
 
 ## Ajuste de hiperparâmetros
 
 Regressão Logística, Random Forest e SVM foram ajustados com `GridSearchCV`,
 validação cruzada estratificada de 5 folds e `recall_malignant` como métrica
-principal de refit. As demais métricas do benchmark também são avaliadas.
+principal de refit. As demais métricas do benchmark também foram avaliadas.
 
-KNN e Árvore de Decisão permanecem documentados no benchmark, mas não são
-ajustados nesta etapa. O teste final segue intocado, e nenhum modelo final foi
-selecionado ou persistido.
+KNN e Árvore de Decisão permaneceram documentados no benchmark, mas não
+foram ajustados naquela etapa. Durante o ajuste, o holdout ainda não havia sido
+acessado, e nenhum modelo final havia sido selecionado ou persistido.
 
 ## Probabilidades e thresholds
 
@@ -66,19 +66,44 @@ probabilidades out-of-fold somente no conjunto de desenvolvimento. Foram
 comparadas probabilidades nativas e calibradas por sigmoid, com thresholds de
 0.05 a 0.95.
 
-A análise usa recall maligno mínimo de 0.97 como restrição acadêmica para
-thresholds provisórios. Esses pontos não são recomendações clínicas. O teste
-final permanece intocado, e nenhum modelo final foi selecionado ou persistido.
+A análise usou recall maligno mínimo de 0.97 como restrição acadêmica para
+thresholds provisórios antes do congelamento da seleção. Esses pontos não eram
+recomendações clínicas. Naquela etapa, o teste final ainda permanecia intocado.
 
-## Seleção congelada e avaliação final
+## Seleção congelada e resultado final
 
 SVM com kernel RBF, `StandardScaler` no pipeline, calibração sigmoid e threshold
 0.51 foi selecionado antes da avaliação final, usando somente estimativas do
-conjunto de desenvolvimento.
+conjunto de desenvolvimento. A execução final foi realizada por:
 
-O código da avaliação final do holdout foi preparado, mas o holdout ainda não
-foi executado nesta etapa. Nenhuma alteração de modelo ou threshold será feita
-após abrir o teste final. O projeto não possui validade clínica.
+```powershell
+.\.venv\Scripts\python.exe -m femhealth.final_run
+```
+
+No holdout final de 114 registros, o resultado foi:
+
+- accuracy: 0.9737;
+- balanced accuracy: 0.9742;
+- precision maligno: 0.9535;
+- recall maligno: 0.9762;
+- F1 maligno: 0.9647;
+- specificity benigno: 0.9722;
+- ROC AUC maligno: 0.9940;
+- average precision maligno: 0.9918;
+- Brier Score: 0.0278;
+- log loss: 0.0950.
+
+Matriz de confusão:
+
+- malignos corretos: 41;
+- falsos negativos malignos: 1;
+- falsos positivos malignos: 2;
+- benignos corretos: 70.
+
+O desempenho final manteve o objetivo observado no desenvolvimento: recall
+maligno alto com especificidade benigna também alta. Nenhuma decisão de modelo,
+calibração ou threshold foi alterada após abrir o holdout. O projeto não possui
+validade clínica.
 
 Este projeto requer Python 3.11.
 
