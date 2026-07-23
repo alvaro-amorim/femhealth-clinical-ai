@@ -70,6 +70,16 @@ A análise usa recall maligno mínimo de 0.97 como restrição acadêmica para
 thresholds provisórios. Esses pontos não são recomendações clínicas. O teste
 final permanece intocado, e nenhum modelo final foi selecionado ou persistido.
 
+## Seleção congelada e avaliação final
+
+SVM com kernel RBF, `StandardScaler` no pipeline, calibração sigmoid e threshold
+0.51 foi selecionado antes da avaliação final, usando somente estimativas do
+conjunto de desenvolvimento.
+
+O código da avaliação final do holdout foi preparado, mas o holdout ainda não
+foi executado nesta etapa. Nenhuma alteração de modelo ou threshold será feita
+após abrir o teste final. O projeto não possui validade clínica.
+
 Este projeto requer Python 3.11.
 
 ## Instalar

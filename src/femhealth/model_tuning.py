@@ -98,7 +98,7 @@ def build_grid_searches(parameter_grids: ParameterGrids | None = None) -> dict[s
 
 
 def build_tuned_candidate_pipelines():
-    """Build fresh untuned-state pipelines with selected hyperparameters applied."""
+    """Build fresh unfitted pipelines with selected hyperparameters applied."""
     pipelines = build_candidate_pipelines()
 
     return {
