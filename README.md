@@ -8,8 +8,8 @@ notebook de treinamento para um modelo serializado em Joblib, consumido por uma 
 FastAPI e apresentado em uma interface Streamlit.
 
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
-selecionado, avaliação final do holdout concluída e resultados registrados. O
-modelo ainda não foi persistido.
+selecionado, avaliação final do holdout concluída, artefato final persistido e
+API de inferência criada.
 
 ## Dataset
 
@@ -110,7 +110,7 @@ validade clínica.
 O estimador final é treinado apenas nos 455 registros de desenvolvimento. Os
 114 registros do holdout não entram no treinamento.
 
-O artefato será gerado por:
+O artefato foi gerado por:
 
 ```powershell
 .\.venv\Scripts\python.exe -m femhealth.model_artifact
@@ -130,6 +130,33 @@ O artefato foi gerado com Scikit-learn 1.9.0 e deve ser carregado com essa mesma
 Arquivos Joblib devem ser carregados somente de fonte confiável. API e
 Streamlit deverão usar esse artefato sem retreinamento. O modelo permanece
 acadêmico e não possui validade clínica.
+
+## API de inferência
+
+A API carrega o modelo uma vez durante o `lifespan`. Nenhuma requisição treina,
+ajusta ou altera o modelo.
+
+Endpoints:
+
+- `GET /health`;
+- `GET /model`;
+- `POST /predict`.
+
+Execução local:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn femhealth.api:app --host 127.0.0.1 --port 8000
+```
+
+A documentação interativa fica disponível em:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+O endpoint `POST /predict` exige um objeto `features` com as 30 chaves
+canônicas. A ordem recebida é normalizada para a ordem canônica antes da
+inferência. O resultado é acadêmico e não possui validade clínica.
 
 Este projeto requer Python 3.11.
 
