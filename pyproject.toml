@@ -9,13 +9,17 @@ description = "Academic foundation for FemHealth ML Triage."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "fastapi",
     "joblib",
     "pandas",
+    "pydantic",
     "scikit-learn==1.9.0",
+    "uvicorn",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "httpx",
     "pytest",
     "pytest-cov",
     "ruff",
