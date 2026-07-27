@@ -1,15 +1,17 @@
-# FemHealth ML Triage
+# FemHealth Clinical AI
 
-Projeto academico para estruturar uma base inicial de triagem em saude feminina com
-apoio de Machine Learning.
+Projeto acadêmico de classificação de padrões do Breast Cancer Wisconsin
+Diagnostic (WDBC), desenvolvido com apoio de aprendizado de máquina.
 
-O objetivo geral e criar, em etapas futuras, um fluxo reprodutivel que va de um
-notebook de treinamento para um modelo serializado em Joblib, consumido por uma API
-FastAPI e apresentado em uma interface Streamlit.
+O repositório implementa um fluxo reproduzível que parte da validação e análise
+dos dados, passa por comparação, ajuste, calibração, avaliação e
+explicabilidade, persiste o modelo em Joblib e disponibiliza inferência por
+FastAPI e Streamlit.
 
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
-FastAPI e interface Streamlit concluídas, e explicabilidade global registrada.
+FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
+notebook técnico consolidado.
 
 ## Dataset
 
@@ -244,6 +246,29 @@ Importância por permutação não representa causalidade. Variáveis correlacio
 podem compartilhar importância. O ranking não removeu variáveis, não alterou o
 modelo e não mudou o threshold. A análise não possui validade clínica.
 
+## Notebook técnico
+
+O notebook técnico executado está em
+`notebooks/02_modelagem_e_explicabilidade.ipynb`.
+
+Ele consolida benchmark, tuning, calibração, seleção congelada, resultado final,
+artefato persistido e explicabilidade global. O holdout final não é reavaliado
+pelo notebook, e a explicabilidade é lida dos artefatos já salvos. O notebook de
+EDA permanece separado em `notebooks/01_exploracao_wdbc.ipynb`.
+
+Para executar novamente em desenvolvimento:
+
+```powershell
+.\.venv\Scripts\python.exe -m jupyter nbconvert `
+  --to notebook `
+  --execute notebooks/02_modelagem_e_explicabilidade.ipynb `
+  --inplace `
+  --ExecutePreprocessor.timeout=900
+```
+
+Essa execução refaz somente as análises de desenvolvimento e lê os resultados
+finais já persistidos.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
@@ -264,4 +289,4 @@ testes atuais também importam módulos de análise e explicabilidade.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Este projeto e academico e nao e uma ferramenta clinica validada.
+Este projeto é acadêmico e não é uma ferramenta clínica validada.
