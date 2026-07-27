@@ -10,16 +10,17 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi",
+    "httpx",
     "joblib",
     "pandas",
     "pydantic",
     "scikit-learn==1.9.0",
+    "streamlit==1.60.0",
     "uvicorn",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx",
     "pytest",
     "pytest-cov",
     "ruff",
