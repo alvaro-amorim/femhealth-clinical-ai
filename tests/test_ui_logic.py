@@ -4,6 +4,8 @@ import pytest
 from femhealth.data import WDBC_FEATURE_NAMES
 from femhealth.ui_logic import (
     build_confusion_matrix,
+    build_explainability_feature_table,
+    build_explainability_fold_table,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
@@ -108,3 +110,88 @@ def test_build_confusion_matrix_uses_persisted_counts() -> None:
         index=["Real: maligno", "Real: benigno"],
     )
     assert matrix.equals(expected)
+
+
+def test_build_explainability_feature_table_translates_and_orders_by_rank() -> None:
+    features = [
+        _feature(rank=2, feature_name="mean texture"),
+        _feature(rank=1, feature_name="mean radius"),
+    ]
+
+    table = build_explainability_feature_table(features)
+
+    assert table.columns.tolist() == [
+        "Posição no ranking",
+        "Variável",
+        "Chave canônica",
+        "Importância média",
+        "Desvio-padrão",
+        "Fração positiva",
+    ]
+    assert table["Posição no ranking"].tolist() == [1, 2]
+    assert table["Variável"].tolist() == ["Raio médio", "Textura média"]
+    assert table["Chave canônica"].tolist() == ["mean radius", "mean texture"]
+    assert table["Importância média"].tolist() == [0.1, 0.1]
+
+
+def test_build_explainability_feature_table_rejects_duplicate_rank() -> None:
+    features = [
+        _feature(rank=1, feature_name="mean radius"),
+        _feature(rank=1, feature_name="mean texture"),
+    ]
+
+    with pytest.raises(ValueError, match="Duplicated explainability ranks"):
+        build_explainability_feature_table(features)
+
+
+def test_build_explainability_feature_table_rejects_unknown_feature() -> None:
+    features = [_feature(rank=1, feature_name="unknown")]
+
+    with pytest.raises(ValueError, match="Feature without Portuguese label"):
+        build_explainability_feature_table(features)
+
+
+def test_build_explainability_fold_table_orders_folds() -> None:
+    fold_scores = [
+        _fold_score(fold=2),
+        _fold_score(fold=1),
+    ]
+
+    table = build_explainability_fold_table(fold_scores)
+
+    assert table.columns.tolist() == [
+        "Fold",
+        "Amostras de treinamento",
+        "Amostras de validação",
+        "Malignos na validação",
+        "Benignos na validação",
+        "ROC AUC maligno",
+    ]
+    assert table["Fold"].tolist() == [1, 2]
+    assert table["ROC AUC maligno"].tolist() == [0.99, 0.99]
+
+
+def test_build_explainability_fold_table_rejects_missing_values() -> None:
+    with pytest.raises(ValueError, match="Missing explainability fold values"):
+        build_explainability_fold_table([{"fold": 1}])
+
+
+def _feature(rank: int, feature_name: str) -> dict:
+    return {
+        "rank": rank,
+        "feature_name": feature_name,
+        "mean_importance": 0.1,
+        "std_importance": 0.01,
+        "positive_fraction": 0.8,
+    }
+
+
+def _fold_score(fold: int) -> dict:
+    return {
+        "fold": fold,
+        "train_sample_count": 364,
+        "validation_sample_count": 91,
+        "validation_malignant_count": 34,
+        "validation_benign_count": 57,
+        "baseline_roc_auc": 0.99,
+    }
