@@ -167,6 +167,14 @@ cada registro pelo `POST /predict` existente. O placar da sessão considera
 somente os casos únicos executados naquela sessão e não substitui a acurácia
 oficial do holdout completo de 114 registros.
 
+O progresso da demonstração pode ser preservado na URL da página pelo parâmetro
+`demo_progress`. Essa persistência é local à navegação, não altera modelo,
+artefatos, métricas ou resultados oficiais, e não é armazenamento de dados
+clínicos. O botão "Reiniciar placar da demonstração" remove esse progresso. Ele
+pode ser perdido se o parâmetro for removido da URL, se a página for aberta por
+uma URL limpa, se a aba não restaurar a URL anterior ou se o botão de reinício
+for usado.
+
 ## API de inferência
 
 A API carrega o modelo uma vez durante o `lifespan`. Nenhuma requisição treina,

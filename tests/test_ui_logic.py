@@ -1,3 +1,6 @@
+import base64
+import json
+
 import pandas as pd
 import pytest
 
@@ -9,11 +12,13 @@ from femhealth.ui_logic import (
     build_explainability_feature_table,
     build_explainability_fold_table,
     compare_demo_prediction,
+    deserialize_demo_progress,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
     prediction_class_pt_br,
     reference_class_pt_br,
+    serialize_demo_progress,
     validate_api_feature_contract,
 )
 
@@ -183,6 +188,223 @@ def test_build_demo_scoreboard_counts_unique_cases() -> None:
     }
 
 
+def test_serialize_and_deserialize_demo_progress_round_trip() -> None:
+    results = {
+        "demo-01": _demo_result("demo-01", predicted_label=0),
+        "demo-04": _demo_result("demo-04", predicted_label=0),
+    }
+
+    encoded = serialize_demo_progress(results, selected_case_id="demo-04")
+    restored_results, selected_case_id = deserialize_demo_progress(encoded, _demo_cases())
+
+    assert selected_case_id == "demo-04"
+    assert restored_results["demo-01"]["sample_index"] == 256
+    assert restored_results["demo-01"]["reference_label"] == 0
+    assert restored_results["demo-01"]["correct"] is True
+    assert restored_results["demo-04"]["sample_index"] == 363
+    assert restored_results["demo-04"]["reference_label"] == 1
+    assert restored_results["demo-04"]["correct"] is False
+    assert restored_results["demo-04"]["probability_malignant"] == 0.62
+
+
+def test_serialize_demo_progress_is_deterministic() -> None:
+    results = {
+        "demo-04": _demo_result("demo-04", predicted_label=0),
+        "demo-01": _demo_result("demo-01", predicted_label=0),
+    }
+
+    assert serialize_demo_progress(results, "demo-04") == serialize_demo_progress(
+        dict(reversed(list(results.items()))),
+        "demo-04",
+    )
+
+
+def test_demo_progress_accepts_eight_results() -> None:
+    results = {
+        f"demo-{position:02d}": _demo_result(
+            f"demo-{position:02d}",
+            predicted_label=_demo_cases()[position - 1]["reference_label"],
+        )
+        for position in range(1, 9)
+    }
+
+    encoded = serialize_demo_progress(results, selected_case_id="demo-08")
+    restored_results, selected_case_id = deserialize_demo_progress(encoded, _demo_cases())
+
+    assert selected_case_id == "demo-08"
+    assert len(restored_results) == 8
+
+
+def test_serialize_demo_progress_rejects_more_than_eight_results() -> None:
+    results = {f"demo-{position:02d}": _demo_result("demo-01") for position in range(1, 10)}
+
+    with pytest.raises(ValueError, match="too many"):
+        serialize_demo_progress(results, selected_case_id="demo-01")
+
+
+def test_deserialize_demo_progress_rejects_more_than_eight_results() -> None:
+    payload = _progress_payload()
+    payload["results"] = {
+        f"demo-{position:02d}": _persisted_result()
+        for position in range(1, 10)
+    }
+
+    with pytest.raises(ValueError, match="too many"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_unknown_case() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-99"] = _persisted_result()
+
+    with pytest.raises(ValueError, match="case id"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_unknown_selected_case() -> None:
+    payload = _progress_payload(selected_case_id="demo-99")
+
+    with pytest.raises(ValueError, match="selected"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_unknown_version() -> None:
+    payload = _progress_payload()
+    payload["version"] = 2
+
+    with pytest.raises(ValueError, match="version"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_invalid_json() -> None:
+    encoded = base64.urlsafe_b64encode(b"not-json").decode("ascii")
+
+    with pytest.raises(ValueError, match="JSON"):
+        deserialize_demo_progress(encoded, _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_invalid_base64() -> None:
+    with pytest.raises(ValueError, match="base64"):
+        deserialize_demo_progress("!!!!", _demo_cases())
+
+
+@pytest.mark.parametrize("invalid_label", [2, 0.0, True])
+def test_deserialize_demo_progress_rejects_invalid_predicted_label(invalid_label) -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["predicted_label"] = invalid_label
+
+    with pytest.raises(ValueError, match="predicted label"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_inconsistent_predicted_class() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["predicted_label"] = 0
+    payload["results"]["demo-01"]["predicted_class"] = "benign"
+
+    with pytest.raises(ValueError, match="inconsistent"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+@pytest.mark.parametrize("value", [-0.01, 1.01])
+def test_deserialize_demo_progress_rejects_probability_outside_range(value) -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["probability_malignant"] = value
+    payload["results"]["demo-01"]["probability_benign"] = 1 - value
+
+    with pytest.raises(ValueError, match="probability"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_deserialize_demo_progress_rejects_non_finite_probabilities(value) -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["probability_malignant"] = value
+
+    with pytest.raises(ValueError, match="probability"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_invalid_probability_sum() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["probability_malignant"] = 0.60
+    payload["results"]["demo-01"]["probability_benign"] = 0.30
+
+    with pytest.raises(ValueError, match="sum"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_unexpected_threshold() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["threshold"] = 0.50
+
+    with pytest.raises(ValueError, match="threshold"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_missing_key() -> None:
+    payload = _progress_payload()
+    del payload["results"]["demo-01"]["threshold"]
+
+    with pytest.raises(ValueError, match="missing"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_deserialize_demo_progress_rejects_additional_key() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["correct"] = True
+
+    with pytest.raises(ValueError, match="unexpected"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
+def test_serialize_demo_progress_does_not_persist_features_reference_or_correct() -> None:
+    result = _demo_result("demo-01")
+    result["features"] = _demo_features()
+
+    with pytest.raises(ValueError, match="unexpected"):
+        serialize_demo_progress({"demo-01": result}, selected_case_id="demo-01")
+
+    result = _demo_result("demo-01")
+    encoded = serialize_demo_progress({"demo-01": result}, selected_case_id="demo-01")
+    raw_payload = _decode_progress_payload(encoded)
+    raw_result = raw_payload["results"]["demo-01"]
+
+    assert "features" not in raw_result
+    assert "reference_label" not in raw_result
+    assert "reference_class" not in raw_result
+    assert "sample_index" not in raw_result
+    assert "correct" not in raw_result
+
+
+def test_deserialize_demo_progress_recalculates_correct_from_official_case() -> None:
+    payload = _progress_payload(selected_case_id="demo-04")
+    payload["results"] = {
+        "demo-04": _persisted_result(
+            predicted_label=0,
+            predicted_class="malignant",
+            probability_malignant=0.62,
+            probability_benign=0.38,
+        )
+    }
+
+    restored_results, _ = deserialize_demo_progress(
+        _encode_progress_payload(payload),
+        _demo_cases(),
+    )
+
+    assert restored_results["demo-04"]["reference_label"] == 1
+    assert restored_results["demo-04"]["correct"] is False
+
+
+def test_deserialize_demo_progress_discards_manually_altered_result_safely() -> None:
+    payload = _progress_payload()
+    payload["results"]["demo-01"]["predicted_class"] = "malignant<script>"
+
+    with pytest.raises(ValueError, match="predicted class"):
+        deserialize_demo_progress(_encode_progress_payload(payload), _demo_cases())
+
+
 def test_build_confusion_matrix_uses_persisted_counts() -> None:
     final_metrics = {
         "true_malignant": 41,
@@ -293,3 +515,79 @@ def _demo_features() -> dict[str, float]:
         feature_name: float(index + 1)
         for index, feature_name in enumerate(WDBC_FEATURE_NAMES)
     }
+
+
+def _demo_cases() -> list[dict]:
+    sample_indices = [256, 428, 501, 363, 564, 464, 358, 343]
+    reference_labels = [0, 1, 0, 1, 0, 1, 1, 0]
+    return [
+        {
+            "case_id": f"demo-{position:02d}",
+            "sample_index": sample_index,
+            "reference_label": reference_label,
+            "reference_class": "malignant" if reference_label == 0 else "benign",
+            "features": _demo_features(),
+        }
+        for position, (sample_index, reference_label) in enumerate(
+            zip(sample_indices, reference_labels, strict=True),
+            start=1,
+        )
+    ]
+
+
+def _demo_result(case_id: str, predicted_label: int = 0) -> dict:
+    official_case = {case["case_id"]: case for case in _demo_cases()}[case_id]
+    predicted_class = "malignant" if predicted_label == 0 else "benign"
+    probability_malignant = 0.62 if case_id == "demo-04" and predicted_label == 0 else 0.99
+    probability_benign = 1 - probability_malignant
+    if predicted_label == 1:
+        probability_malignant = 0.01
+        probability_benign = 0.99
+
+    return {
+        "case_id": case_id,
+        "sample_index": official_case["sample_index"],
+        "reference_label": official_case["reference_label"],
+        "reference_class": official_case["reference_class"],
+        "predicted_label": predicted_label,
+        "predicted_class": predicted_class,
+        "probability_malignant": probability_malignant,
+        "probability_benign": probability_benign,
+        "threshold": 0.51,
+        "correct": official_case["reference_label"] == predicted_label,
+    }
+
+
+def _persisted_result(
+    predicted_label: int = 0,
+    predicted_class: str = "malignant",
+    probability_malignant: float = 0.99,
+    probability_benign: float = 0.01,
+) -> dict:
+    return {
+        "predicted_label": predicted_label,
+        "predicted_class": predicted_class,
+        "probability_malignant": probability_malignant,
+        "probability_benign": probability_benign,
+        "threshold": 0.51,
+    }
+
+
+def _progress_payload(selected_case_id: str | None = "demo-01") -> dict:
+    return {
+        "version": 1,
+        "selected_case_id": selected_case_id,
+        "results": {
+            "demo-01": _persisted_result(),
+        },
+    }
+
+
+def _encode_progress_payload(payload: dict) -> str:
+    raw_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw_json).decode("ascii").rstrip("=")
+
+
+def _decode_progress_payload(encoded: str) -> dict:
+    padded = encoded + ("=" * (-len(encoded) % 4))
+    return json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))

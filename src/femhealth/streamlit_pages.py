@@ -22,16 +22,19 @@ from femhealth.ui_logic import (
     build_explainability_feature_table,
     build_explainability_fold_table,
     compare_demo_prediction,
+    deserialize_demo_progress,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
     prediction_class_pt_br,
     reference_class_pt_br,
+    serialize_demo_progress,
     validate_api_feature_contract,
 )
 
 _DEMO_RESULTS_STATE_KEY = "demo_cases_page_results"
 _DEMO_LAST_CASE_STATE_KEY = "demo_cases_page_last_case_id"
+_DEMO_PROGRESS_QUERY_PARAM = "demo_progress"
 
 
 def render_presentation_page() -> None:
@@ -264,11 +267,17 @@ def render_demo_cases_page() -> None:
         "substitui a avaliação oficial dos 114 registros."
     )
 
+    _initialize_demo_progress_state(demo_cases["cases"])
     results = _get_demo_results_state()
     case_options = list(enumerate(demo_cases["cases"], start=1))
+    default_case_index = _resolve_demo_selectbox_index(
+        case_options,
+        _get_demo_last_case_id_state(),
+    )
     selected_position, selected_case = st.selectbox(
         "Caso",
         case_options,
+        index=default_case_index,
         format_func=lambda option: f"Caso {option[0]} — índice {option[1]['sample_index']}",
         key="demo_cases_page_selected_case",
     )
@@ -303,7 +312,9 @@ def render_demo_cases_page() -> None:
                 correct,
             )
             st.session_state[_DEMO_LAST_CASE_STATE_KEY] = selected_case["case_id"]
+            _sync_demo_progress_query_param(results, selected_case["case_id"])
 
+    _render_demo_reset_button(results)
     selected_result = results.get(selected_case["case_id"])
     if selected_result is not None:
         _render_demo_case_result(selected_result)
@@ -383,6 +394,84 @@ def _get_demo_results_state() -> dict[str, dict]:
     return results
 
 
+def _get_demo_last_case_id_state() -> str | None:
+    if _DEMO_LAST_CASE_STATE_KEY not in st.session_state:
+        return None
+
+    value = st.session_state[_DEMO_LAST_CASE_STATE_KEY]
+    return value if isinstance(value, str) else None
+
+
+def _initialize_demo_progress_state(demo_cases: list[dict]) -> None:
+    if _DEMO_RESULTS_STATE_KEY in st.session_state:
+        return
+
+    encoded_progress = _get_demo_progress_query_param()
+    if encoded_progress is None:
+        st.session_state[_DEMO_RESULTS_STATE_KEY] = {}
+        st.session_state.pop(_DEMO_LAST_CASE_STATE_KEY, None)
+        return
+
+    try:
+        results, selected_case_id = deserialize_demo_progress(encoded_progress, demo_cases)
+    except ValueError:
+        st.session_state[_DEMO_RESULTS_STATE_KEY] = {}
+        st.session_state.pop(_DEMO_LAST_CASE_STATE_KEY, None)
+        _remove_demo_progress_query_param()
+        return
+
+    st.session_state[_DEMO_RESULTS_STATE_KEY] = results
+    if selected_case_id is None:
+        st.session_state.pop(_DEMO_LAST_CASE_STATE_KEY, None)
+    else:
+        st.session_state[_DEMO_LAST_CASE_STATE_KEY] = selected_case_id
+
+
+def _get_demo_progress_query_param() -> str | None:
+    raw_value = st.query_params.get(_DEMO_PROGRESS_QUERY_PARAM)
+    if raw_value is None:
+        return None
+
+    if isinstance(raw_value, list):
+        if len(raw_value) != 1:
+            _remove_demo_progress_query_param()
+            return None
+
+        raw_value = raw_value[0]
+
+    if not isinstance(raw_value, str) or not raw_value:
+        _remove_demo_progress_query_param()
+        return None
+
+    return raw_value
+
+
+def _sync_demo_progress_query_param(results: dict[str, dict], selected_case_id: str) -> None:
+    st.query_params[_DEMO_PROGRESS_QUERY_PARAM] = serialize_demo_progress(
+        results,
+        selected_case_id,
+    )
+
+
+def _remove_demo_progress_query_param() -> None:
+    if _DEMO_PROGRESS_QUERY_PARAM in st.query_params:
+        del st.query_params[_DEMO_PROGRESS_QUERY_PARAM]
+
+
+def _resolve_demo_selectbox_index(
+    case_options: list[tuple[int, dict]],
+    selected_case_id: str | None,
+) -> int:
+    if selected_case_id is None:
+        return 0
+
+    for option_index, (_, demo_case) in enumerate(case_options):
+        if demo_case["case_id"] == selected_case_id:
+            return option_index
+
+    return 0
+
+
 def _build_demo_case_result(selected_case: dict, prediction: dict, correct: bool) -> dict:
     return {
         "case_id": selected_case["case_id"],
@@ -432,13 +521,16 @@ def _render_demo_case_result(result: dict) -> None:
     )
 
 
-def _render_demo_scoreboard(results: dict[str, dict]) -> None:
-    st.subheader("Placar da sessão")
+def _render_demo_reset_button(results: dict[str, dict]) -> None:
     if st.button("Reiniciar placar da demonstração", key="demo_cases_page_reset_button"):
         results.clear()
         st.session_state[_DEMO_RESULTS_STATE_KEY] = results
         st.session_state.pop(_DEMO_LAST_CASE_STATE_KEY, None)
+        _remove_demo_progress_query_param()
 
+
+def _render_demo_scoreboard(results: dict[str, dict]) -> None:
+    st.subheader("Placar da sessão")
     scoreboard = build_demo_scoreboard(
         {case_id: result["correct"] for case_id, result in results.items()}
     )
