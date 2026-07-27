@@ -1,0 +1,6 @@
+fold,train_sample_count,validation_sample_count,train_malignant_count,train_benign_count,validation_malignant_count,validation_benign_count,baseline_roc_auc
+1,364,91,136,228,34,57,0.9891640866873066
+2,364,91,136,228,34,57,0.9979360165118679
+3,364,91,136,228,34,57,0.9974200206398348
+4,364,91,136,228,34,57,0.9979360165118679
+5,364,91,136,228,34,57,0.9989680082559339

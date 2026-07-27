@@ -8,8 +8,8 @@ notebook de treinamento para um modelo serializado em Joblib, consumido por uma 
 FastAPI e apresentado em uma interface Streamlit.
 
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
-selecionado, avaliação final do holdout concluída, artefato final persistido e
-API de inferência criada.
+selecionado, avaliação final do holdout concluída, artefato final persistido,
+FastAPI e interface Streamlit concluídas, e explicabilidade global registrada.
 
 ## Dataset
 
@@ -127,9 +127,10 @@ O carregamento validado recalcula o hash antes de carregar o estimador.
 
 O artefato foi gerado com Scikit-learn 1.9.0 e deve ser carregado com essa mesma versão.
 
-Arquivos Joblib devem ser carregados somente de fonte confiável. API e
-Streamlit deverão usar esse artefato sem retreinamento. O modelo permanece
-acadêmico e não possui validade clínica.
+Arquivos Joblib devem ser carregados somente de fonte confiável. A FastAPI usa
+esse artefato sem retreinamento, e o Streamlit consome a inferência
+exclusivamente pela API. O modelo permanece acadêmico e não possui validade
+clínica.
 
 ## API de inferência
 
@@ -201,6 +202,48 @@ O simulador exige um objeto `features` com as 30 chaves canônicas. A ordem
 recebida é normalizada antes do envio à API. O resultado é acadêmico e não
 possui validade clínica.
 
+## Explicabilidade global
+
+O SVM RBF não possui uma importância nativa simples por coeficientes. Por isso,
+a explicabilidade global usa importância por permutação em validação cruzada
+estratificada de 5 folds.
+
+A análise usa somente os 455 registros de desenvolvimento. O holdout não é
+reutilizado. A métrica analisada é ROC AUC da classe maligna.
+
+Comando:
+
+```powershell
+.\.venv\Scripts\python.exe -m femhealth.explainability_run
+```
+
+Arquivos gerados:
+
+- `reports/explainability/permutation_importance_details.csv`;
+- `reports/explainability/permutation_importance_summary.csv`;
+- `reports/explainability/permutation_importance_fold_scores.csv`;
+- `reports/explainability/permutation_importance_metadata.json`;
+- `reports/explainability/permutation_importance_top15.png`.
+
+Resumo observado:
+
+| Feature | Importância média | Desvio-padrão |
+| --- | ---: | ---: |
+| `worst texture` | 0.005593 | 0.004609 |
+| `radius error` | 0.002023 | 0.002566 |
+| `worst radius` | 0.001992 | 0.003237 |
+| `worst area` | 0.001775 | 0.003215 |
+| `worst concave points` | 0.001672 | 0.002882 |
+
+As diferenças entre várias posições do ranking são pequenas em relação à
+variabilidade observada. Por isso, o ranking deve ser interpretado como uma
+indicação global aproximada de dependência preditiva, e não como uma ordem
+precisa de relevância clínica.
+
+Importância por permutação não representa causalidade. Variáveis correlacionadas
+podem compartilhar importância. O ranking não removeu variáveis, não alterou o
+modelo e não mudou o threshold. A análise não possui validade clínica.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
@@ -208,8 +251,11 @@ Este projeto requer Python 3.11.
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,analysis]"
 ```
+
+O extra `analysis` é recomendado para o desenvolvimento completo, pois os
+testes atuais também importam módulos de análise e explicabilidade.
 
 ## Validar
 
