@@ -6,6 +6,7 @@ from femhealth.api_client import (
     DEFAULT_TIMEOUT_SECONDS,
     PNG_SIGNATURE,
     FemHealthApiError,
+    get_demo_cases,
     get_explainability,
     get_explainability_plot,
     get_health,
@@ -136,6 +137,22 @@ def test_get_explainability_plot_makes_expected_request_and_returns_png() -> Non
     assert seen_requests[0].url.path == "/explainability/plot"
 
 
+def test_get_demo_cases_makes_expected_request_once() -> None:
+    seen_requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(request)
+        return httpx.Response(200, json={"case_count": 8}, request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        payload = get_demo_cases(client=client)
+
+    assert payload == {"case_count": 8}
+    assert len(seen_requests) == 1
+    assert seen_requests[0].method == "GET"
+    assert seen_requests[0].url.path == "/demo-cases"
+
+
 @pytest.mark.parametrize(
     ("headers", "content"),
     [
@@ -162,6 +179,15 @@ def test_timeout_uses_safe_message() -> None:
             get_health(client=client)
 
 
+def test_get_demo_cases_timeout_uses_safe_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("slow", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="A API demorou para responder."):
+            get_demo_cases(client=client)
+
+
 def test_explainability_plot_timeout_uses_safe_message() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.TimeoutException("slow", request=request)
@@ -178,6 +204,15 @@ def test_connection_error_uses_safe_message() -> None:
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(FemHealthApiError, match="Não foi possível conectar à API"):
             get_health(client=client)
+
+
+def test_get_demo_cases_connection_error_uses_safe_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="Não foi possível conectar à API"):
+            get_demo_cases(client=client)
 
 
 def test_explainability_plot_connection_error_uses_safe_message() -> None:
@@ -222,6 +257,15 @@ def test_explainability_plot_http_errors_use_safe_messages(status_code, message)
             get_explainability_plot(client=client)
 
 
+def test_get_demo_cases_503_uses_safe_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={"detail": "unavailable"}, request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="temporariamente"):
+            get_demo_cases(client=client)
+
+
 @pytest.mark.parametrize(
     "response",
     [
@@ -239,6 +283,15 @@ def test_invalid_json_payload_is_rejected(response) -> None:
             get_health(client=client)
 
 
+def test_get_demo_cases_invalid_json_payload_is_rejected() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not-json", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="A API retornou uma resposta inválida."):
+            get_demo_cases(client=client)
+
+
 def test_injected_client_is_not_closed() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"status": "ok"}, request=request)
@@ -246,6 +299,18 @@ def test_injected_client_is_not_closed() -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler))
     try:
         get_health(client=client)
+        assert not client.is_closed
+    finally:
+        client.close()
+
+
+def test_injected_client_for_demo_cases_is_not_closed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"case_count": 8}, request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    try:
+        get_demo_cases(client=client)
         assert not client.is_closed
     finally:
         client.close()
@@ -321,5 +386,31 @@ def test_internally_created_client_for_plot_is_closed(monkeypatch) -> None:
     monkeypatch.setattr("femhealth.api_client.httpx.Client", FakeClient)
 
     assert get_explainability_plot() == PNG_SIGNATURE + b"plot"
+    assert len(instances) == 1
+    assert instances[0].closed is True
+
+
+def test_internally_created_client_for_demo_cases_is_closed(monkeypatch) -> None:
+    instances = []
+
+    class FakeClient:
+        def __init__(self, timeout: float):
+            self.timeout = timeout
+            self.closed = False
+            instances.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            self.closed = True
+
+        def get(self, url: str, timeout: float) -> httpx.Response:
+            request = httpx.Request("GET", url)
+            return httpx.Response(200, json={"case_count": 8}, request=request)
+
+    monkeypatch.setattr("femhealth.api_client.httpx.Client", FakeClient)
+
+    assert get_demo_cases() == {"case_count": 8}
     assert len(instances) == 1
     assert instances[0].closed is True

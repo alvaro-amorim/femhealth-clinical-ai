@@ -70,6 +70,14 @@ def get_explainability_plot(
     return _request_bytes("GET", "/explainability/plot", base_url=base_url, client=client)
 
 
+def get_demo_cases(
+    base_url: str | None = None,
+    client: httpx.Client | None = None,
+) -> dict:
+    """Get validated demonstration cases from the API."""
+    return _request_json("GET", "/demo-cases", base_url=base_url, client=client)
+
+
 def request_prediction(
     features: dict[str, float],
     base_url: str | None = None,

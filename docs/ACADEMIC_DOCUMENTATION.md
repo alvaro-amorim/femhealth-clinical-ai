@@ -126,6 +126,29 @@ A interpretação deve ser cautelosa. O teste final contém apenas 42 casos
 malignos; por isso, cada erro tem impacto relevante nas métricas. Também há
 apenas uma divisão de teste e não existe validação externa independente.
 
+### Casos de demonstração materializados
+
+Após a avaliação final já congelada, oito registros do holdout final foram
+materializados em `artifacts/demo/holdout_demo_cases.json` para demonstração
+acadêmica em vídeo. A regra de seleção foi: primeiros oito registros na ordem
+congelada do holdout final.
+
+Os índices são `256`, `428`, `501`, `363`, `564`, `464`, `358` e `343`, com
+quatro registros `malignant` e quatro registros `benign`. Eles não foram
+selecionados por acerto, erro, probabilidade, confiança, dificuldade ou classe
+prevista; uma divergência está presente naturalmente, mas não foi usada como
+critério.
+
+Esses oito registros nunca foram usados no treinamento nem na seleção atual do
+modelo. A página de demonstração executa cada caso pelo endpoint `POST /predict`
+existente e compara o rótulo de referência do dataset com a classificação
+retornada. A taxa exibida na sessão é apenas descritiva dos casos únicos
+executados naquela sessão e não substitui a acurácia oficial dos 114 registros.
+
+Como esses oito registros passam a ser exemplos públicos conhecidos, futuras
+versões do modelo não devem usá-los para seleção ou avaliação independente. Uma
+futura avaliação exige novos dados externos ou novo conjunto preservado.
+
 ## 8. Explicabilidade
 
 A explicabilidade global foi calculada por importância de permutação, usando

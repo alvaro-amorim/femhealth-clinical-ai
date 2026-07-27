@@ -12,6 +12,15 @@ import femhealth.explainability_artifacts as explainability_artifacts_module
 from femhealth.api import create_app
 from femhealth.api_schemas import ACADEMIC_DISCLAIMER, PredictionRequest
 from femhealth.data import WDBC_FEATURE_NAMES
+from femhealth.demo_cases_artifact import (
+    DEMO_BENIGN_CASE_COUNT,
+    DEMO_CASE_COUNT,
+    DEMO_EXPECTED_REFERENCE_LABELS,
+    DEMO_EXPECTED_SAMPLE_INDICES,
+    DEMO_MALIGNANT_CASE_COUNT,
+    DEMO_OFFICIAL_HOLDOUT_ACCURACY,
+    DEMO_SELECTION_RULE,
+)
 from femhealth.explainability_artifacts import PNG_SIGNATURE
 from femhealth.final_selection import SELECTED_THRESHOLD, SELECTED_VARIANT
 
@@ -62,6 +71,24 @@ EXPECTED_EXPLAINABILITY_FIELDS = {
     "fold_scores",
     "limitations",
     "plot_endpoint",
+    "disclaimer",
+}
+EXPECTED_DEMO_CASES_FIELDS = {
+    "artifact_version",
+    "source_dataset",
+    "source_split",
+    "selection_rule",
+    "used_for_training",
+    "used_for_model_selection",
+    "created_after_final_evaluation",
+    "training_sample_count",
+    "holdout_sample_count",
+    "official_holdout_accuracy",
+    "case_count",
+    "malignant_case_count",
+    "benign_case_count",
+    "feature_names",
+    "cases",
     "disclaimer",
 }
 
@@ -153,11 +180,51 @@ def explainability_loader(explainability_payload):
     return lambda: (explainability_payload, PNG_SIGNATURE + b"plot")
 
 
+@pytest.fixture()
+def demo_cases_payload(valid_features) -> dict[str, object]:
+    cases = []
+    for position, sample_index in enumerate(DEMO_EXPECTED_SAMPLE_INDICES, start=1):
+        reference_label = DEMO_EXPECTED_REFERENCE_LABELS[sample_index]
+        cases.append(
+            {
+                "case_id": f"demo-{position:02d}",
+                "sample_index": sample_index,
+                "reference_label": reference_label,
+                "reference_class": "malignant" if reference_label == 0 else "benign",
+                "features": valid_features,
+            }
+        )
+
+    return {
+        "artifact_version": "1.0.0",
+        "source_dataset": "WDBC",
+        "source_split": "final_holdout",
+        "selection_rule": DEMO_SELECTION_RULE,
+        "used_for_training": False,
+        "used_for_model_selection": False,
+        "created_after_final_evaluation": True,
+        "training_sample_count": 455,
+        "holdout_sample_count": 114,
+        "official_holdout_accuracy": DEMO_OFFICIAL_HOLDOUT_ACCURACY,
+        "case_count": DEMO_CASE_COUNT,
+        "malignant_case_count": DEMO_MALIGNANT_CASE_COUNT,
+        "benign_case_count": DEMO_BENIGN_CASE_COUNT,
+        "feature_names": WDBC_FEATURE_NAMES,
+        "cases": cases,
+    }
+
+
+@pytest.fixture()
+def demo_cases_loader(demo_cases_payload):
+    return lambda: demo_cases_payload
+
+
 def test_create_app_does_not_load_artifact_or_explainability_immediately(
     metadata,
     explainability_payload,
+    demo_cases_payload,
 ) -> None:
-    calls = {"artifact": 0, "explainability": 0}
+    calls = {"artifact": 0, "explainability": 0, "demo": 0}
 
     def fake_loader():
         calls["artifact"] += 1
@@ -167,41 +234,60 @@ def test_create_app_does_not_load_artifact_or_explainability_immediately(
         calls["explainability"] += 1
         return explainability_payload, PNG_SIGNATURE + b"plot"
 
-    create_app(artifact_loader=fake_loader, explainability_loader=fake_explainability_loader)
+    def fake_demo_cases_loader():
+        calls["demo"] += 1
+        return demo_cases_payload
 
-    assert calls == {"artifact": 0, "explainability": 0}
+    create_app(
+        artifact_loader=fake_loader,
+        explainability_loader=fake_explainability_loader,
+        demo_cases_loader=fake_demo_cases_loader,
+    )
+
+    assert calls == {"artifact": 0, "explainability": 0, "demo": 0}
 
 
 def test_testclient_lifespan_loads_once_and_removes_state(
     metadata,
     explainability_payload,
+    demo_cases_payload,
 ) -> None:
-    calls = {"artifact": 0, "explainability": 0}
+    calls = {"artifact": 0, "explainability": 0, "demo": 0}
     app = create_app(
         artifact_loader=lambda: _load_once(calls, metadata),
         explainability_loader=lambda: _load_explainability_once(calls, explainability_payload),
+        demo_cases_loader=lambda: _load_demo_cases_once(calls, demo_cases_payload),
     )
 
     with TestClient(app) as client:
-        assert calls == {"artifact": 1, "explainability": 1}
+        assert calls == {"artifact": 1, "explainability": 1, "demo": 1}
         assert hasattr(app.state, "estimator")
         assert hasattr(app.state, "explainability_payload")
+        assert hasattr(app.state, "demo_cases_payload")
         assert client.get("/health").status_code == 200
         assert client.get("/model").status_code == 200
         assert client.get("/explainability").status_code == 200
         assert client.get("/explainability/plot").status_code == 200
-        assert calls == {"artifact": 1, "explainability": 1}
+        assert client.get("/demo-cases").status_code == 200
+        assert client.get("/demo-cases").status_code == 200
+        assert calls == {"artifact": 1, "explainability": 1, "demo": 1}
 
     assert not hasattr(app.state, "estimator")
     assert not hasattr(app.state, "metadata")
     assert not hasattr(app.state, "explainability_payload")
     assert not hasattr(app.state, "explainability_plot_bytes")
+    assert not hasattr(app.state, "demo_cases_payload")
 
 
-def test_health_returns_loaded_model_information(metadata, explainability_loader) -> None:
+def test_health_returns_loaded_model_information(
+    metadata,
+    explainability_loader,
+    demo_cases_loader,
+) -> None:
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
 
     with TestClient(app) as client:
@@ -216,10 +302,15 @@ def test_health_returns_loaded_model_information(metadata, explainability_loader
     assert payload["selected_variant"] == SELECTED_VARIANT
 
 
-def test_model_returns_safe_metadata_fields(metadata, explainability_loader) -> None:
+def test_model_returns_safe_metadata_fields(
+    metadata,
+    explainability_loader,
+    demo_cases_loader,
+) -> None:
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
 
     with TestClient(app) as client:
@@ -237,6 +328,7 @@ def test_predict_reorders_features_and_calls_inference_once(
     monkeypatch,
     metadata,
     explainability_loader,
+    demo_cases_loader,
     valid_features,
 ) -> None:
     calls = {"predict": 0}
@@ -261,6 +353,7 @@ def test_predict_reorders_features_and_calls_inference_once(
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
     reversed_features = dict(reversed(list(valid_features.items())))
     original_payload = {"features": reversed_features.copy()}
@@ -316,10 +409,16 @@ def test_predict_reorders_features_and_calls_inference_once(
         pytest.param({}, id="missing-features"),
     ],
 )
-def test_predict_rejects_invalid_payloads(metadata, explainability_loader, payload) -> None:
+def test_predict_rejects_invalid_payloads(
+    metadata,
+    explainability_loader,
+    demo_cases_loader,
+    payload,
+) -> None:
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
 
     with TestClient(app) as client:
@@ -331,10 +430,12 @@ def test_predict_rejects_invalid_payloads(metadata, explainability_loader, paylo
 def test_predict_missing_features_returns_standard_validation_detail(
     metadata,
     explainability_loader,
+    demo_cases_loader,
 ) -> None:
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
 
     with TestClient(app) as client:
@@ -363,10 +464,12 @@ def test_prediction_request_rejects_non_finite_values(invalid_value) -> None:
 def test_explainability_returns_payload_and_plot(
     metadata,
     explainability_loader,
+    demo_cases_loader,
 ) -> None:
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
 
     with TestClient(app) as client:
@@ -386,10 +489,56 @@ def test_explainability_returns_payload_and_plot(
     assert plot_response.content.startswith(PNG_SIGNATURE)
 
 
-def test_endpoints_return_503_without_lifespan_state(metadata, explainability_loader) -> None:
+def test_demo_cases_returns_validated_payload_without_inference(
+    monkeypatch,
+    metadata,
+    explainability_loader,
+    demo_cases_loader,
+) -> None:
+    calls = {"predict": 0}
+
+    def fake_predict_with_artifact(*args, **kwargs):
+        calls["predict"] += 1
+        raise AssertionError("GET /demo-cases must not execute inference")
+
+    monkeypatch.setattr(api_module, "predict_with_artifact", fake_predict_with_artifact)
     app = create_app(
         artifact_loader=lambda: (FakeEstimator(), metadata),
         explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/demo-cases")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert set(payload) == EXPECTED_DEMO_CASES_FIELDS
+    assert payload["case_count"] == DEMO_CASE_COUNT
+    assert payload["malignant_case_count"] == DEMO_MALIGNANT_CASE_COUNT
+    assert payload["benign_case_count"] == DEMO_BENIGN_CASE_COUNT
+    assert payload["selection_rule"] == DEMO_SELECTION_RULE
+    assert payload["used_for_training"] is False
+    assert payload["used_for_model_selection"] is False
+    assert payload["official_holdout_accuracy"] == DEMO_OFFICIAL_HOLDOUT_ACCURACY
+    assert payload["feature_names"] == WDBC_FEATURE_NAMES
+    assert len(payload["cases"]) == DEMO_CASE_COUNT
+    assert len(payload["cases"][0]["features"]) == 30
+    assert payload["disclaimer"] == ACADEMIC_DISCLAIMER
+    assert "artifacts" not in str(payload)
+    assert "reports" not in str(payload)
+    assert calls["predict"] == 0
+
+
+def test_endpoints_return_503_without_lifespan_state(
+    metadata,
+    explainability_loader,
+    demo_cases_loader,
+) -> None:
+    app = create_app(
+        artifact_loader=lambda: (FakeEstimator(), metadata),
+        explainability_loader=explainability_loader,
+        demo_cases_loader=demo_cases_loader,
     )
     client = TestClient(app)
 
@@ -397,6 +546,7 @@ def test_endpoints_return_503_without_lifespan_state(metadata, explainability_lo
     assert client.get("/model").status_code == 503
     assert client.get("/explainability").status_code == 503
     assert client.get("/explainability/plot").status_code == 503
+    assert client.get("/demo-cases").status_code == 503
     assert client.post(
         "/predict",
         json={"features": {feature: 1.0 for feature in WDBC_FEATURE_NAMES}},
@@ -453,3 +603,11 @@ def _load_explainability_once(
 ) -> tuple[dict[str, object], bytes]:
     calls["explainability"] += 1
     return payload, PNG_SIGNATURE + b"plot"
+
+
+def _load_demo_cases_once(
+    calls: dict[str, int],
+    payload: dict[str, object],
+) -> dict[str, object]:
+    calls["demo"] += 1
+    return payload

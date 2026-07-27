@@ -10,12 +10,14 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from femhealth.api_schemas import (
     ACADEMIC_DISCLAIMER,
+    DemoCasesResponse,
     ExplainabilityResponse,
     HealthResponse,
     ModelInfoResponse,
     PredictionRequest,
     PredictionResponse,
 )
+from femhealth.demo_cases_artifact import load_demo_cases_artifact
 from femhealth.explainability_artifacts import load_explainability_artifacts
 from femhealth.inference import predict_with_artifact
 from femhealth.model_artifact import load_model_artifact
@@ -27,6 +29,7 @@ API_VERSION = "1.0.0"
 def create_app(
     artifact_loader: Callable[[], tuple[object, dict]] | None = None,
     explainability_loader: Callable[[], tuple[dict, bytes]] | None = None,
+    demo_cases_loader: Callable[[], dict] | None = None,
 ) -> FastAPI:
     """Create the FastAPI app without loading the model until lifespan startup."""
 
@@ -40,10 +43,15 @@ def create_app(
             else explainability_loader
         )
         explainability_payload, explainability_plot_bytes = explainability_artifact_loader()
+        demo_artifact_loader = (
+            load_demo_cases_artifact if demo_cases_loader is None else demo_cases_loader
+        )
+        demo_cases_payload = demo_artifact_loader()
         app.state.estimator = estimator
         app.state.metadata = metadata
         app.state.explainability_payload = explainability_payload
         app.state.explainability_plot_bytes = explainability_plot_bytes
+        app.state.demo_cases_payload = demo_cases_payload
         try:
             yield
         finally:
@@ -55,6 +63,8 @@ def create_app(
                 del app.state.explainability_payload
             if hasattr(app.state, "explainability_plot_bytes"):
                 del app.state.explainability_plot_bytes
+            if hasattr(app.state, "demo_cases_payload"):
+                del app.state.demo_cases_payload
 
     app = FastAPI(
         title=API_TITLE,
@@ -125,6 +135,11 @@ def create_app(
         plot_bytes = _get_loaded_explainability_plot_bytes(request)
         return Response(content=plot_bytes, media_type="image/png")
 
+    @app.get("/demo-cases", response_model=DemoCasesResponse)
+    def demo_cases(request: Request) -> DemoCasesResponse:
+        payload = _get_loaded_demo_cases_payload(request)
+        return DemoCasesResponse(**payload, disclaimer=ACADEMIC_DISCLAIMER)
+
     return app
 
 
@@ -156,6 +171,16 @@ def _get_loaded_explainability_plot_bytes(request: Request) -> bytes:
         )
 
     return request.app.state.explainability_plot_bytes
+
+
+def _get_loaded_demo_cases_payload(request: Request) -> dict:
+    if not hasattr(request.app.state, "demo_cases_payload"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo cases artifact is unavailable",
+        )
+
+    return request.app.state.demo_cases_payload
 
 
 app = create_app()
