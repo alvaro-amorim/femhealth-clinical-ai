@@ -11,7 +11,18 @@ FastAPI e Streamlit.
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
 FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
-integrada à aplicação, e notebook técnico consolidado.
+integrada à aplicação, notebook técnico consolidado e documentação acadêmica
+consolidada.
+
+## Documentação
+
+- [Documentação acadêmica](docs/ACADEMIC_DOCUMENTATION.md);
+- [Model Card](docs/MODEL_CARD.md);
+- [Arquitetura](docs/ARCHITECTURE.md);
+- [Ética e uso responsável](docs/RESPONSIBLE_USE.md);
+- [Uso de inteligência artificial](docs/AI_USAGE.md);
+- [Notebook de EDA](notebooks/01_exploracao_wdbc.ipynb);
+- [Notebook técnico](notebooks/02_modelagem_e_explicabilidade.ipynb).
 
 ## Dataset
 
