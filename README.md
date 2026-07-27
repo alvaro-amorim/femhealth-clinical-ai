@@ -158,6 +158,49 @@ O endpoint `POST /predict` exige um objeto `features` com as 30 chaves
 canônicas. A ordem recebida é normalizada para a ordem canônica antes da
 inferência. O resultado é acadêmico e não possui validade clínica.
 
+## Interface Streamlit
+
+A interface Streamlit é em português, usa tema claro e consome exclusivamente a
+FastAPI por HTTP. O Streamlit não carrega o Joblib e toda inferência passa pela
+API.
+
+Páginas:
+
+- Apresentação;
+- Modelo e resultados;
+- Simulador.
+
+A API deve ser iniciada primeiro.
+
+Terminal 1:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn femhealth.api:app --host 127.0.0.1 --port 8000
+```
+
+Terminal 2:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run streamlit_app.py
+```
+
+Endereço padrão:
+
+```text
+http://localhost:8501
+```
+
+A variável `FEMHEALTH_API_URL` define a URL da API usada pela interface. O padrão
+é:
+
+```text
+http://127.0.0.1:8000
+```
+
+O simulador exige um objeto `features` com as 30 chaves canônicas. A ordem
+recebida é normalizada antes do envio à API. O resultado é acadêmico e não
+possui validade clínica.
+
 Este projeto requer Python 3.11.
 
 ## Instalar
