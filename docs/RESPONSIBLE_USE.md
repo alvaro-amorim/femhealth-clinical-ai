@@ -39,6 +39,24 @@ A calibração é limitada ao WDBC e ao protocolo executado. O limiar de decisã
 0.51 é uma escolha acadêmica congelada para este experimento e não deve ser
 transferido para prática clínica.
 
+## Casos de demonstração conhecidos
+
+Oito registros do holdout final foram materializados após a avaliação final
+congelada para demonstração acadêmica. A regra foi usar os primeiros oito
+registros na ordem congelada do holdout final, sem selecionar por acerto, erro,
+probabilidade, confiança, dificuldade ou classe prevista.
+
+Esses registros não foram usados no treinamento nem na seleção atual do modelo,
+mas passam a ser exemplos públicos conhecidos a partir desta versão. Portanto,
+futuras versões não devem usá-los para seleção de modelo ou avaliação
+independente.
+
+A taxa exibida pela página de demonstração descreve somente os casos únicos
+executados na sessão atual. Ela não substitui a acurácia oficial do holdout
+completo de 114 registros.
+
+Uma futura avaliação exige novos dados externos ou novo conjunto preservado.
+
 ## Explicabilidade responsável
 
 A importância por permutação mede dependência preditiva global. Ela não mede

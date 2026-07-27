@@ -11,8 +11,8 @@ FastAPI e Streamlit.
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
 FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
-integrada à aplicação, notebook técnico consolidado e documentação acadêmica
-consolidada.
+integrada à aplicação, casos de demonstração do holdout final materializados
+para vídeo, notebook técnico consolidado e documentação acadêmica consolidada.
 
 ## Documentação
 
@@ -145,6 +145,28 @@ esse artefato sem retreinamento, e o Streamlit consome a inferência
 exclusivamente pela API. O modelo permanece acadêmico e não possui validade
 clínica.
 
+## Casos de demonstração do holdout
+
+Após a avaliação final já congelada, oito registros do holdout foram
+materializados em `artifacts/demo/holdout_demo_cases.json` para facilitar a
+demonstração em vídeo. A regra foi: primeiros oito registros na ordem congelada
+do holdout final.
+
+Índices selecionados: `256`, `428`, `501`, `363`, `564`, `464`, `358`, `343`.
+São quatro registros `malignant` e quatro registros `benign`. A seleção não foi
+feita por acerto, erro, probabilidade, confiança, dificuldade ou classe prevista;
+a divergência existente aparece naturalmente na ordem congelada.
+
+Esses registros não foram usados no treinamento nem na seleção atual do modelo.
+Eles são exemplos públicos conhecidos a partir desta versão e não devem ser
+usados em versões futuras para seleção de modelo ou avaliação independente. Uma
+futura avaliação exige novos dados externos ou novo conjunto preservado.
+
+A página Streamlit "Casos de demonstração" consulta `GET /demo-cases` e executa
+cada registro pelo `POST /predict` existente. O placar da sessão considera
+somente os casos únicos executados naquela sessão e não substitui a acurácia
+oficial do holdout completo de 114 registros.
+
 ## API de inferência
 
 A API carrega o modelo uma vez durante o `lifespan`. Nenhuma requisição treina,
@@ -156,6 +178,7 @@ Endpoints:
 - `GET /model`;
 - `GET /explainability`;
 - `GET /explainability/plot`;
+- `GET /demo-cases`;
 - `POST /predict`.
 
 Os artefatos de explicabilidade são validados e carregados uma vez no
@@ -189,10 +212,15 @@ Páginas:
 - Apresentação;
 - Modelo e resultados;
 - Explicabilidade;
+- Casos de demonstração;
 - Simulador.
 
 A página de explicabilidade consome JSON e PNG pela FastAPI. O Streamlit não lê
 diretamente os arquivos em `reports/explainability`.
+
+A página de casos de demonstração consome o JSON versionado pela FastAPI e usa o
+endpoint `POST /predict` para executar cada registro. Ela não carrega dataset,
+Joblib, notebooks ou arquivos de resultados diretamente.
 
 A API deve ser iniciada primeiro.
 

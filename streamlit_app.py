@@ -33,6 +33,11 @@ pages = {
     ],
     "Uso acadêmico": [
         st.Page(
+            streamlit_pages.render_demo_cases_page,
+            title="Casos de demonstração",
+            url_path="casos-demonstracao",
+        ),
+        st.Page(
             streamlit_pages.render_simulator_page,
             title="Simulador",
             url_path="simulador",

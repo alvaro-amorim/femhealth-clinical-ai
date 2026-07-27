@@ -7,6 +7,7 @@ import streamlit as st
 
 from femhealth.api_client import (
     FemHealthApiError,
+    get_demo_cases,
     get_explainability,
     get_explainability_plot,
     get_health,
@@ -16,14 +17,21 @@ from femhealth.api_client import (
 from femhealth.ui_labels import group_feature_names, translate_feature_name
 from femhealth.ui_logic import (
     build_confusion_matrix,
+    build_demo_feature_table,
+    build_demo_scoreboard,
     build_explainability_feature_table,
     build_explainability_fold_table,
+    compare_demo_prediction,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
     prediction_class_pt_br,
+    reference_class_pt_br,
     validate_api_feature_contract,
 )
+
+_DEMO_RESULTS_STATE_KEY = "demo_cases_page_results"
+_DEMO_LAST_CASE_STATE_KEY = "demo_cases_page_last_case_id"
 
 
 def render_presentation_page() -> None:
@@ -225,6 +233,84 @@ def render_simulator_page() -> None:
     _render_prediction_result(prediction)
 
 
+def render_demo_cases_page() -> None:
+    """Render holdout demonstration cases served by the API."""
+    st.title("Casos de demonstração")
+    st.warning(
+        "Os casos desta página pertencem ao holdout final e não foram usados no "
+        "treinamento. Eles são apresentados somente para demonstração acadêmica após a "
+        "avaliação final já congelada."
+    )
+
+    try:
+        demo_cases = get_demo_cases()
+        _validate_demo_cases_payload_for_page(demo_cases)
+    except (FemHealthApiError, ValueError) as exc:
+        st.error(str(exc))
+        st.info("Inicie o serviço FastAPI antes de consultar os casos de demonstração.")
+        return
+
+    st.caption("Seleção: Primeiros oito registros na ordem congelada do holdout final.")
+    metric_columns = st.columns(4)
+    metric_columns[0].metric("Casos disponíveis", str(demo_cases["case_count"]))
+    metric_columns[1].metric("Malignos", str(demo_cases["malignant_case_count"]))
+    metric_columns[2].metric("Benignos", str(demo_cases["benign_case_count"]))
+    metric_columns[3].metric(
+        "Acurácia oficial do holdout completo",
+        format_probability(demo_cases["official_holdout_accuracy"]),
+    )
+    st.warning(
+        "A taxa desta página considera apenas os casos executados nesta sessão e não "
+        "substitui a avaliação oficial dos 114 registros."
+    )
+
+    results = _get_demo_results_state()
+    case_options = list(enumerate(demo_cases["cases"], start=1))
+    selected_position, selected_case = st.selectbox(
+        "Caso",
+        case_options,
+        format_func=lambda option: f"Caso {option[0]} — índice {option[1]['sample_index']}",
+        key="demo_cases_page_selected_case",
+    )
+    del selected_position
+
+    with st.expander("Consultar os 30 valores do caso"):
+        st.dataframe(
+            build_demo_feature_table(selected_case["features"]),
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Valor": st.column_config.NumberColumn(
+                    "Valor",
+                    format="%.6f",
+                ),
+            },
+        )
+
+    if st.button("Executar caso selecionado", key="demo_cases_page_run_button"):
+        try:
+            prediction = request_prediction(selected_case["features"])
+            correct = compare_demo_prediction(
+                selected_case["reference_label"],
+                prediction["predicted_label"],
+            )
+        except (FemHealthApiError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            results[selected_case["case_id"]] = _build_demo_case_result(
+                selected_case,
+                prediction,
+                correct,
+            )
+            st.session_state[_DEMO_LAST_CASE_STATE_KEY] = selected_case["case_id"]
+
+    selected_result = results.get(selected_case["case_id"])
+    if selected_result is not None:
+        _render_demo_case_result(selected_result)
+
+    _render_demo_scoreboard(results)
+
+
 def _render_prediction_form(feature_names: list[str]) -> tuple[bool, dict[str, float | None]]:
     feature_values: dict[str, float | None] = {}
 
@@ -269,6 +355,107 @@ def _render_prediction_result(prediction: dict) -> None:
     )
     columns[2].metric("Limiar aplicado", format_decimal_pt_br(prediction["threshold"]))
     st.warning(prediction["disclaimer"])
+
+
+def _validate_demo_cases_payload_for_page(demo_cases: dict) -> None:
+    if demo_cases["case_count"] != 8:
+        raise ValueError("Quantidade inesperada de casos de demonstração.")
+
+    if demo_cases["malignant_case_count"] != 4:
+        raise ValueError("Quantidade inesperada de casos malignos.")
+
+    if demo_cases["benign_case_count"] != 4:
+        raise ValueError("Quantidade inesperada de casos benignos.")
+
+    if demo_cases["used_for_training"] is not False:
+        raise ValueError("Casos de demonstração não podem ter sido usados no treinamento.")
+
+    if demo_cases["used_for_model_selection"] is not False:
+        raise ValueError("Casos de demonstração não podem ter sido usados na seleção.")
+
+
+def _get_demo_results_state() -> dict[str, dict]:
+    results = st.session_state.setdefault(_DEMO_RESULTS_STATE_KEY, {})
+    if not isinstance(results, dict):
+        st.session_state[_DEMO_RESULTS_STATE_KEY] = {}
+        return st.session_state[_DEMO_RESULTS_STATE_KEY]
+
+    return results
+
+
+def _build_demo_case_result(selected_case: dict, prediction: dict, correct: bool) -> dict:
+    return {
+        "case_id": selected_case["case_id"],
+        "sample_index": selected_case["sample_index"],
+        "reference_label": selected_case["reference_label"],
+        "reference_class": selected_case["reference_class"],
+        "predicted_label": int(prediction["predicted_label"]),
+        "predicted_class": prediction["predicted_class"],
+        "probability_malignant": float(prediction["probability_malignant"]),
+        "probability_benign": float(prediction["probability_benign"]),
+        "threshold": float(prediction["threshold"]),
+        "correct": correct,
+    }
+
+
+def _render_demo_case_result(result: dict) -> None:
+    st.subheader("Resultado do caso")
+    status_label = "Acertou" if result["correct"] else "Divergiu"
+    if result["correct"]:
+        st.success(status_label)
+    else:
+        st.warning(status_label)
+
+    columns = st.columns(3)
+    columns[0].metric(
+        "Rótulo de referência do dataset",
+        f"{reference_class_pt_br(result['reference_class'])} ({result['reference_label']})",
+    )
+    columns[1].metric(
+        "Classificação produzida pelo modelo",
+        prediction_class_pt_br(result["predicted_class"]),
+    )
+    columns[2].metric("Acertou ou Divergiu", status_label)
+
+    probability_columns = st.columns(3)
+    probability_columns[0].metric(
+        "Probabilidade estimada — padrão maligno",
+        format_probability(result["probability_malignant"]),
+    )
+    probability_columns[1].metric(
+        "Probabilidade estimada — padrão benigno",
+        format_probability(result["probability_benign"]),
+    )
+    probability_columns[2].metric(
+        "Limiar aplicado",
+        format_decimal_pt_br(result["threshold"]),
+    )
+
+
+def _render_demo_scoreboard(results: dict[str, dict]) -> None:
+    st.subheader("Placar da sessão")
+    if st.button("Reiniciar placar da demonstração", key="demo_cases_page_reset_button"):
+        results.clear()
+        st.session_state[_DEMO_RESULTS_STATE_KEY] = results
+        st.session_state.pop(_DEMO_LAST_CASE_STATE_KEY, None)
+
+    scoreboard = build_demo_scoreboard(
+        {case_id: result["correct"] for case_id, result in results.items()}
+    )
+    accuracy_value = scoreboard["accuracy"]
+    formatted_accuracy = (
+        accuracy_value if isinstance(accuracy_value, str) else format_probability(accuracy_value)
+    )
+
+    columns = st.columns(4)
+    columns[0].metric("Casos únicos testados", str(scoreboard["tested"]))
+    columns[1].metric("Acertos", str(scoreboard["correct"]))
+    columns[2].metric("Divergências", str(scoreboard["divergences"]))
+    columns[3].metric("Taxa de acerto da demonstração", formatted_accuracy)
+    st.caption(
+        "Esta taxa é descritiva da sessão atual. A avaliação oficial permanece sendo a "
+        "do holdout completo de 114 registros."
+    )
 
 
 def _build_feature_contract_table(feature_names: list[str]) -> pd.DataFrame:

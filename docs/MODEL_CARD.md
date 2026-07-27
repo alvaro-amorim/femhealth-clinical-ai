@@ -118,6 +118,25 @@ Matriz de confusão:
 | Maligno | 41 | 1 falso negativo |
 | Benigno | 2 falsos positivos | 70 |
 
+## Casos de demonstração
+
+Oito registros do holdout final foram materializados após a avaliação final já
+congelada, somente para demonstração acadêmica. A regra foi usar os primeiros
+oito registros na ordem congelada do holdout final, sem seleção por desempenho,
+probabilidade, confiança, dificuldade, erro ou classe prevista.
+
+Índices: `256`, `428`, `501`, `363`, `564`, `464`, `358`, `343`. São quatro
+registros `malignant` e quatro registros `benign`. Eles não foram usados no
+treinamento do artefato nem na seleção atual do modelo.
+
+A taxa calculada na página de demonstração descreve apenas os casos únicos
+executados na sessão Streamlit. Ela não substitui a métrica oficial do holdout
+completo de 114 registros.
+
+Esses registros passam a ser exemplos públicos conhecidos. Futuras versões do
+modelo não devem usá-los para seleção ou avaliação independente; uma nova
+avaliação exige novos dados externos ou novo conjunto preservado.
+
 ## Explicabilidade
 
 A explicabilidade global usa importância por permutação em validação cruzada

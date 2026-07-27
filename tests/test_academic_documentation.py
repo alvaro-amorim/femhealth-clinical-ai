@@ -174,11 +174,26 @@ def test_documentation_references_notebooks_and_artifacts() -> None:
         "notebooks/01_exploracao_wdbc.ipynb",
         "notebooks/02_modelagem_e_explicabilidade.ipynb",
         "artifacts/model/femhealth_svm_sigmoid.joblib",
+        "artifacts/demo/holdout_demo_cases.json",
         "reports/explainability",
     ]
 
     for reference in expected_references:
         assert reference in combined_text
+
+
+def test_documentation_describes_demo_cases_governance() -> None:
+    combined_text = _combined_documentation_text()
+    expected_terms = [
+        "primeiros oito registros",
+        "não foram usados no treinamento",
+        "não devem usá-los para seleção",
+        "avaliação exige novos dados externos ou novo conjunto preservado",
+        "não substitui a acurácia oficial",
+    ]
+
+    for term in expected_terms:
+        assert term in combined_text
 
 
 def _combined_documentation_text() -> str:

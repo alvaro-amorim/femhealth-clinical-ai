@@ -70,6 +70,81 @@ def prediction_class_pt_br(predicted_class: str) -> str:
     raise ValueError("Unexpected predicted class")
 
 
+def reference_class_pt_br(reference_class: str) -> str:
+    """Translate reference classes for demonstration cases."""
+    if reference_class == "malignant":
+        return "Maligno"
+
+    if reference_class == "benign":
+        return "Benigno"
+
+    raise ValueError("Unexpected reference class")
+
+
+def build_demo_feature_table(features: dict[str, float]) -> pd.DataFrame:
+    """Build a display table for one demonstration case."""
+    if not isinstance(features, dict):
+        raise ValueError("Demo features must be an object")
+
+    expected_features = list(FEATURE_LABELS_PT_BR)
+    if list(features) != expected_features:
+        raise ValueError("Unexpected demo feature names")
+
+    rows = []
+    for position, feature_name in enumerate(expected_features, start=1):
+        value = features[feature_name]
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            raise ValueError("Demo feature values must be finite numbers")
+
+        numeric_value = float(value)
+        if not math.isfinite(numeric_value):
+            raise ValueError("Demo feature values must be finite numbers")
+
+        rows.append(
+            {
+                "Número": position,
+                "Variável": translate_feature_name(feature_name),
+                "Chave canônica": feature_name,
+                "Valor": numeric_value,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def compare_demo_prediction(
+    reference_label: int,
+    predicted_label: int,
+) -> bool:
+    """Compare reference and predicted labels for a demonstration case."""
+    if isinstance(reference_label, bool) or reference_label not in {0, 1}:
+        raise ValueError("Unexpected reference label")
+
+    if isinstance(predicted_label, bool) or predicted_label not in {0, 1}:
+        raise ValueError("Unexpected predicted label")
+
+    return reference_label == predicted_label
+
+
+def build_demo_scoreboard(case_results: dict[str, bool]) -> dict[str, int | float | str]:
+    """Build unique-case scoreboard values for the current Streamlit session."""
+    for result in case_results.values():
+        if not isinstance(result, bool):
+            raise ValueError("Demo scoreboard values must be booleans")
+
+    tested = len(case_results)
+    correct = sum(case_results.values())
+    divergences = tested - correct
+    accuracy = "—" if tested == 0 else correct / tested
+
+    return {
+        "tested": tested,
+        "correct": correct,
+        "divergences": divergences,
+        "accuracy": accuracy,
+    }
+
+
 def build_confusion_matrix(final_metrics: dict) -> pd.DataFrame:
     """Build a display table from persisted confusion counts."""
     return pd.DataFrame(

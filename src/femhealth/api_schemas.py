@@ -84,6 +84,33 @@ class ExplainabilityResponse(BaseModel):
     disclaimer: str
 
 
+class DemoCaseResponse(BaseModel):
+    case_id: str
+    sample_index: int
+    reference_label: Literal[0, 1]
+    reference_class: Literal["malignant", "benign"]
+    features: dict[str, float]
+
+
+class DemoCasesResponse(BaseModel):
+    artifact_version: str
+    source_dataset: str
+    source_split: str
+    selection_rule: str
+    used_for_training: bool
+    used_for_model_selection: bool
+    created_after_final_evaluation: bool
+    training_sample_count: int
+    holdout_sample_count: int
+    official_holdout_accuracy: float
+    case_count: int
+    malignant_case_count: int
+    benign_case_count: int
+    feature_names: list[str]
+    cases: list[DemoCaseResponse]
+    disclaimer: str
+
+
 class PredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -4,12 +4,16 @@ import pytest
 from femhealth.data import WDBC_FEATURE_NAMES
 from femhealth.ui_logic import (
     build_confusion_matrix,
+    build_demo_feature_table,
+    build_demo_scoreboard,
     build_explainability_feature_table,
     build_explainability_fold_table,
+    compare_demo_prediction,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
     prediction_class_pt_br,
+    reference_class_pt_br,
     validate_api_feature_contract,
 )
 
@@ -90,6 +94,93 @@ def test_prediction_class_pt_br_translates_classes() -> None:
 def test_prediction_class_pt_br_rejects_unknown_class() -> None:
     with pytest.raises(ValueError, match="Unexpected predicted class"):
         prediction_class_pt_br("unknown")
+
+
+def test_reference_class_pt_br_translates_classes() -> None:
+    assert reference_class_pt_br("malignant") == "Maligno"
+    assert reference_class_pt_br("benign") == "Benigno"
+
+
+def test_reference_class_pt_br_rejects_unknown_class() -> None:
+    with pytest.raises(ValueError, match="Unexpected reference class"):
+        reference_class_pt_br("unknown")
+
+
+def test_build_demo_feature_table_uses_canonical_order_and_translations() -> None:
+    features = _demo_features()
+
+    table = build_demo_feature_table(features)
+
+    assert table.columns.tolist() == ["Número", "Variável", "Chave canônica", "Valor"]
+    assert table.shape == (30, 4)
+    assert table["Número"].tolist() == list(range(1, 31))
+    assert table["Chave canônica"].tolist() == WDBC_FEATURE_NAMES
+    assert table["Variável"].iloc[0] == "Raio médio"
+    assert table["Valor"].tolist() == [float(index + 1) for index in range(30)]
+
+
+def test_build_demo_feature_table_rejects_missing_feature() -> None:
+    features = _demo_features()
+    del features[WDBC_FEATURE_NAMES[0]]
+
+    with pytest.raises(ValueError, match="feature names"):
+        build_demo_feature_table(features)
+
+
+def test_build_demo_feature_table_rejects_extra_feature() -> None:
+    features = _demo_features()
+    features["extra"] = 1.0
+
+    with pytest.raises(ValueError, match="feature names"):
+        build_demo_feature_table(features)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), True, "1.0"])
+def test_build_demo_feature_table_rejects_invalid_values(value) -> None:
+    features = _demo_features()
+    features[WDBC_FEATURE_NAMES[0]] = value
+
+    with pytest.raises(ValueError, match="finite numbers"):
+        build_demo_feature_table(features)
+
+
+def test_compare_demo_prediction_returns_label_match() -> None:
+    assert compare_demo_prediction(0, 0) is True
+    assert compare_demo_prediction(0, 1) is False
+
+
+@pytest.mark.parametrize(
+    ("reference_label", "predicted_label"),
+    [(2, 0), (0, 2), (True, 0), (0, False)],
+)
+def test_compare_demo_prediction_rejects_invalid_labels(reference_label, predicted_label) -> None:
+    with pytest.raises(ValueError):
+        compare_demo_prediction(reference_label, predicted_label)
+
+
+def test_build_demo_scoreboard_handles_empty_session() -> None:
+    assert build_demo_scoreboard({}) == {
+        "tested": 0,
+        "correct": 0,
+        "divergences": 0,
+        "accuracy": "—",
+    }
+
+
+def test_build_demo_scoreboard_counts_unique_cases() -> None:
+    scoreboard = build_demo_scoreboard(
+        {
+            "demo-01": True,
+            "demo-04": False,
+        }
+    )
+
+    assert scoreboard == {
+        "tested": 2,
+        "correct": 1,
+        "divergences": 1,
+        "accuracy": 0.5,
+    }
 
 
 def test_build_confusion_matrix_uses_persisted_counts() -> None:
@@ -194,4 +285,11 @@ def _fold_score(fold: int) -> dict:
         "validation_malignant_count": 34,
         "validation_benign_count": 57,
         "baseline_roc_auc": 0.99,
+    }
+
+
+def _demo_features() -> dict[str, float]:
+    return {
+        feature_name: float(index + 1)
+        for index, feature_name in enumerate(WDBC_FEATURE_NAMES)
     }
