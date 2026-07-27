@@ -5,7 +5,7 @@ def test_streamlit_app_renders_with_unavailable_api(monkeypatch) -> None:
     monkeypatch.setenv("FEMHEALTH_API_URL", "http://127.0.0.1:9")
     monkeypatch.setenv("FEMHEALTH_API_TIMEOUT_SECONDS", "0.05")
 
-    app = AppTest.from_file("streamlit_app.py").run()
+    app = AppTest.from_file("streamlit_app.py").run(timeout=10)
 
     assert not app.exception
     assert any("FemHealth Clinical AI" in title.value for title in app.title)

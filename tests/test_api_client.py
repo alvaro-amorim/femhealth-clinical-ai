@@ -4,7 +4,10 @@ import pytest
 from femhealth.api_client import (
     DEFAULT_API_BASE_URL,
     DEFAULT_TIMEOUT_SECONDS,
+    PNG_SIGNATURE,
     FemHealthApiError,
+    get_explainability,
+    get_explainability_plot,
     get_health,
     get_model_info,
     request_prediction,
@@ -96,6 +99,60 @@ def test_request_prediction_makes_expected_request_without_mutating_payload() ->
     assert seen_requests[0].read() == b'{"features":{"mean radius":1.0}}'
 
 
+def test_get_explainability_makes_expected_request() -> None:
+    seen_requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(request)
+        return httpx.Response(200, json={"feature_count": 30}, request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        payload = get_explainability(client=client)
+
+    assert payload == {"feature_count": 30}
+    assert len(seen_requests) == 1
+    assert seen_requests[0].method == "GET"
+    assert seen_requests[0].url.path == "/explainability"
+
+
+def test_get_explainability_plot_makes_expected_request_and_returns_png() -> None:
+    seen_requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(request)
+        return httpx.Response(
+            200,
+            content=PNG_SIGNATURE + b"plot",
+            headers={"content-type": "image/png"},
+            request=request,
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        payload = get_explainability_plot(client=client)
+
+    assert payload == PNG_SIGNATURE + b"plot"
+    assert len(seen_requests) == 1
+    assert seen_requests[0].method == "GET"
+    assert seen_requests[0].url.path == "/explainability/plot"
+
+
+@pytest.mark.parametrize(
+    ("headers", "content"),
+    [
+        ({"content-type": "application/json"}, PNG_SIGNATURE + b"plot"),
+        ({"content-type": "image/png"}, b""),
+        ({"content-type": "image/png"}, b"not-png"),
+    ],
+)
+def test_get_explainability_plot_rejects_invalid_png(headers, content) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=content, headers=headers, request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="resposta inv"):
+            get_explainability_plot(client=client)
+
+
 def test_timeout_uses_safe_message() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.TimeoutException("slow", request=request)
@@ -105,6 +162,15 @@ def test_timeout_uses_safe_message() -> None:
             get_health(client=client)
 
 
+def test_explainability_plot_timeout_uses_safe_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("slow", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="demorou"):
+            get_explainability_plot(client=client)
+
+
 def test_connection_error_uses_safe_message() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("offline", request=request)
@@ -112,6 +178,15 @@ def test_connection_error_uses_safe_message() -> None:
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(FemHealthApiError, match="Não foi possível conectar à API"):
             get_health(client=client)
+
+
+def test_explainability_plot_connection_error_uses_safe_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match="conectar"):
+            get_explainability_plot(client=client)
 
 
 @pytest.mark.parametrize(
@@ -129,6 +204,22 @@ def test_http_errors_use_safe_messages(status_code, message) -> None:
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(FemHealthApiError, match=message):
             get_health(client=client)
+
+
+@pytest.mark.parametrize(
+    ("status_code", "message"),
+    [
+        (503, "temporariamente"),
+        (500, "inesperado"),
+    ],
+)
+def test_explainability_plot_http_errors_use_safe_messages(status_code, message) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, json={"detail": "internal"}, request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(FemHealthApiError, match=message):
+            get_explainability_plot(client=client)
 
 
 @pytest.mark.parametrize(
@@ -160,6 +251,23 @@ def test_injected_client_is_not_closed() -> None:
         client.close()
 
 
+def test_injected_client_for_plot_is_not_closed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=PNG_SIGNATURE + b"plot",
+            headers={"content-type": "image/png"},
+            request=request,
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    try:
+        get_explainability_plot(client=client)
+        assert not client.is_closed
+    finally:
+        client.close()
+
+
 def test_internally_created_client_is_closed(monkeypatch) -> None:
     instances = []
 
@@ -182,5 +290,36 @@ def test_internally_created_client_is_closed(monkeypatch) -> None:
     monkeypatch.setattr("femhealth.api_client.httpx.Client", FakeClient)
 
     assert get_health() == {"status": "ok"}
+    assert len(instances) == 1
+    assert instances[0].closed is True
+
+
+def test_internally_created_client_for_plot_is_closed(monkeypatch) -> None:
+    instances = []
+
+    class FakeClient:
+        def __init__(self, timeout: float):
+            self.timeout = timeout
+            self.closed = False
+            instances.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            self.closed = True
+
+        def get(self, url: str, timeout: float) -> httpx.Response:
+            request = httpx.Request("GET", url)
+            return httpx.Response(
+                200,
+                content=PNG_SIGNATURE + b"plot",
+                headers={"content-type": "image/png"},
+                request=request,
+            )
+
+    monkeypatch.setattr("femhealth.api_client.httpx.Client", FakeClient)
+
+    assert get_explainability_plot() == PNG_SIGNATURE + b"plot"
     assert len(instances) == 1
     assert instances[0].closed is True

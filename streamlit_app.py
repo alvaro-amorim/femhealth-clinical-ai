@@ -25,6 +25,11 @@ pages = {
             title="Modelo e resultados",
             url_path="modelo",
         ),
+        st.Page(
+            streamlit_pages.render_explainability_page,
+            title="Explicabilidade",
+            url_path="explicabilidade",
+        ),
     ],
     "Uso acadêmico": [
         st.Page(

@@ -6,7 +6,7 @@ import math
 
 import pandas as pd
 
-from femhealth.ui_labels import FEATURE_LABELS_PT_BR
+from femhealth.ui_labels import FEATURE_LABELS_PT_BR, translate_feature_name
 
 
 def validate_api_feature_contract(feature_names: list[str]) -> None:
@@ -85,3 +85,71 @@ def build_confusion_matrix(final_metrics: dict) -> pd.DataFrame:
         },
         index=["Real: maligno", "Real: benigno"],
     )
+
+
+def build_explainability_feature_table(features: list[dict]) -> pd.DataFrame:
+    """Build a display table for global permutation importance features."""
+    if not features:
+        raise ValueError("Explainability features must not be empty")
+
+    ranks = [feature.get("rank") for feature in features]
+    if len(set(ranks)) != len(ranks):
+        raise ValueError("Duplicated explainability ranks")
+
+    rows = []
+    required_keys = {
+        "rank",
+        "feature_name",
+        "mean_importance",
+        "std_importance",
+        "positive_fraction",
+    }
+    for feature in features:
+        if not required_keys.issubset(feature):
+            raise ValueError("Missing explainability feature values")
+
+        feature_name = feature["feature_name"]
+        rows.append(
+            {
+                "Posição no ranking": feature["rank"],
+                "Variável": translate_feature_name(feature_name),
+                "Chave canônica": feature_name,
+                "Importância média": feature["mean_importance"],
+                "Desvio-padrão": feature["std_importance"],
+                "Fração positiva": feature["positive_fraction"],
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values("Posição no ranking").reset_index(drop=True)
+
+
+def build_explainability_fold_table(fold_scores: list[dict]) -> pd.DataFrame:
+    """Build a display table for explainability validation fold scores."""
+    if not fold_scores:
+        raise ValueError("Explainability fold scores must not be empty")
+
+    required_keys = {
+        "fold",
+        "train_sample_count",
+        "validation_sample_count",
+        "validation_malignant_count",
+        "validation_benign_count",
+        "baseline_roc_auc",
+    }
+    rows = []
+    for fold_score in fold_scores:
+        if not required_keys.issubset(fold_score):
+            raise ValueError("Missing explainability fold values")
+
+        rows.append(
+            {
+                "Fold": fold_score["fold"],
+                "Amostras de treinamento": fold_score["train_sample_count"],
+                "Amostras de validação": fold_score["validation_sample_count"],
+                "Malignos na validação": fold_score["validation_malignant_count"],
+                "Benignos na validação": fold_score["validation_benign_count"],
+                "ROC AUC maligno": fold_score["baseline_roc_auc"],
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values("Fold").reset_index(drop=True)

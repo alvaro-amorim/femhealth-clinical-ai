@@ -6,15 +6,17 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from femhealth.api_schemas import (
     ACADEMIC_DISCLAIMER,
+    ExplainabilityResponse,
     HealthResponse,
     ModelInfoResponse,
     PredictionRequest,
     PredictionResponse,
 )
+from femhealth.explainability_artifacts import load_explainability_artifacts
 from femhealth.inference import predict_with_artifact
 from femhealth.model_artifact import load_model_artifact
 
@@ -24,6 +26,7 @@ API_VERSION = "1.0.0"
 
 def create_app(
     artifact_loader: Callable[[], tuple[object, dict]] | None = None,
+    explainability_loader: Callable[[], tuple[dict, bytes]] | None = None,
 ) -> FastAPI:
     """Create the FastAPI app without loading the model until lifespan startup."""
 
@@ -31,8 +34,16 @@ def create_app(
     async def lifespan(app: FastAPI):
         loader = load_model_artifact if artifact_loader is None else artifact_loader
         estimator, metadata = loader()
+        explainability_artifact_loader = (
+            load_explainability_artifacts
+            if explainability_loader is None
+            else explainability_loader
+        )
+        explainability_payload, explainability_plot_bytes = explainability_artifact_loader()
         app.state.estimator = estimator
         app.state.metadata = metadata
+        app.state.explainability_payload = explainability_payload
+        app.state.explainability_plot_bytes = explainability_plot_bytes
         try:
             yield
         finally:
@@ -40,6 +51,10 @@ def create_app(
                 del app.state.estimator
             if hasattr(app.state, "metadata"):
                 del app.state.metadata
+            if hasattr(app.state, "explainability_payload"):
+                del app.state.explainability_payload
+            if hasattr(app.state, "explainability_plot_bytes"):
+                del app.state.explainability_plot_bytes
 
     app = FastAPI(
         title=API_TITLE,
@@ -96,6 +111,20 @@ def create_app(
             disclaimer=ACADEMIC_DISCLAIMER,
         )
 
+    @app.get("/explainability", response_model=ExplainabilityResponse)
+    def explainability(request: Request) -> ExplainabilityResponse:
+        payload = _get_loaded_explainability_payload(request)
+        return ExplainabilityResponse(
+            **payload,
+            plot_endpoint="/explainability/plot",
+            disclaimer=ACADEMIC_DISCLAIMER,
+        )
+
+    @app.get("/explainability/plot")
+    def explainability_plot(request: Request) -> Response:
+        plot_bytes = _get_loaded_explainability_plot_bytes(request)
+        return Response(content=plot_bytes, media_type="image/png")
+
     return app
 
 
@@ -107,6 +136,26 @@ def _get_loaded_artifact(request: Request) -> tuple[object, dict]:
         )
 
     return request.app.state.estimator, request.app.state.metadata
+
+
+def _get_loaded_explainability_payload(request: Request) -> dict:
+    if not hasattr(request.app.state, "explainability_payload"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Explainability artifact is unavailable",
+        )
+
+    return request.app.state.explainability_payload
+
+
+def _get_loaded_explainability_plot_bytes(request: Request) -> bytes:
+    if not hasattr(request.app.state, "explainability_plot_bytes"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Explainability artifact is unavailable",
+        )
+
+    return request.app.state.explainability_plot_bytes
 
 
 app = create_app()

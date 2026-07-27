@@ -5,10 +5,19 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from femhealth.api_client import FemHealthApiError, get_health, get_model_info, request_prediction
+from femhealth.api_client import (
+    FemHealthApiError,
+    get_explainability,
+    get_explainability_plot,
+    get_health,
+    get_model_info,
+    request_prediction,
+)
 from femhealth.ui_labels import group_feature_names, translate_feature_name
 from femhealth.ui_logic import (
     build_confusion_matrix,
+    build_explainability_feature_table,
+    build_explainability_fold_table,
     format_decimal_pt_br,
     format_probability,
     model_variant_pt_br,
@@ -95,6 +104,86 @@ def render_model_page() -> None:
     st.caption(f"Versão do artefato: {model_info['artifact_version']}")
     st.caption(f"SHA-256: {model_info['model_sha256']}")
     st.warning(model_info["disclaimer"])
+
+
+def render_explainability_page() -> None:
+    """Render global explainability artifacts served by the API."""
+    st.title("Explicabilidade global")
+    st.warning(
+        "A análise mostra dependência preditiva global do modelo. Não representa "
+        "causalidade, diagnóstico ou relevância clínica."
+    )
+
+    try:
+        explainability = get_explainability()
+        plot_bytes = get_explainability_plot()
+    except FemHealthApiError as exc:
+        st.error(str(exc))
+        st.info("Inicie o serviço FastAPI para consultar a explicabilidade.")
+        return
+
+    try:
+        _validate_explainability_payload(explainability)
+        feature_table = build_explainability_feature_table(explainability["features"])
+        fold_table = build_explainability_fold_table(explainability["fold_scores"])
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+
+    columns = st.columns(5)
+    columns[0].metric(
+        "Amostras de desenvolvimento",
+        str(explainability["development_sample_count"]),
+    )
+    columns[1].metric("Folds", str(explainability["cv_splits"]))
+    columns[2].metric("Repetições por variável", str(explainability["permutation_repeats"]))
+    columns[3].metric("ROC AUC médio", format_probability(explainability["mean_fold_roc_auc"]))
+    columns[4].metric(
+        "Desvio-padrão entre folds",
+        format_decimal_pt_br(explainability["std_fold_roc_auc"], decimal_places=4),
+    )
+
+    st.image(plot_bytes, caption="Importância média por permutação, com barras de erro.")
+    st.write(
+        "Maior importância média não implica causalidade. Diferenças pequenas devem "
+        "ser interpretadas com cautela, e features correlacionadas podem compartilhar "
+        "importância."
+    )
+
+    st.subheader("Principais variáveis")
+    st.dataframe(
+        feature_table.head(15),
+        hide_index=True,
+        use_container_width=True,
+        column_config=_explainability_feature_column_config(),
+    )
+
+    with st.expander("Ranking completo das 30 variáveis"):
+        st.dataframe(
+            feature_table,
+            hide_index=True,
+            use_container_width=True,
+            column_config=_explainability_feature_column_config(),
+        )
+
+    st.subheader("Folds de validação")
+    st.dataframe(
+        fold_table,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "ROC AUC maligno": st.column_config.NumberColumn(
+                "ROC AUC maligno",
+                format="%.6f",
+            ),
+        },
+    )
+
+    st.subheader("Limitações registradas")
+    for limitation in explainability["limitations"]:
+        st.markdown(f"- {limitation}")
+
+    st.warning(explainability["disclaimer"])
 
 
 def render_simulator_page() -> None:
@@ -192,3 +281,31 @@ def _build_feature_contract_table(feature_names: list[str]) -> pd.DataFrame:
             "Chave técnica canônica": feature_names,
         }
     )
+
+
+def _validate_explainability_payload(explainability: dict) -> None:
+    if explainability["holdout_used"] is not False:
+        raise ValueError("Explainability holdout flag is invalid")
+
+    if explainability["feature_count"] != 30:
+        raise ValueError("Explainability feature count is invalid")
+
+    if explainability["detail_row_count"] != 1500:
+        raise ValueError("Explainability detail count is invalid")
+
+
+def _explainability_feature_column_config() -> dict:
+    return {
+        "Importância média": st.column_config.NumberColumn(
+            "Importância média",
+            format="%.6f",
+        ),
+        "Desvio-padrão": st.column_config.NumberColumn(
+            "Desvio-padrão",
+            format="%.6f",
+        ),
+        "Fração positiva": st.column_config.NumberColumn(
+            "Fração positiva",
+            format="percent",
+        ),
+    }

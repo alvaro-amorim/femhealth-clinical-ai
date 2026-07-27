@@ -37,6 +37,53 @@ class ModelInfoResponse(BaseModel):
     disclaimer: str
 
 
+class ExplainabilityFeatureResponse(BaseModel):
+    rank: int
+    feature_name: str
+    feature_position: int
+    mean_importance: float
+    std_importance: float
+    median_importance: float
+    min_importance: float
+    max_importance: float
+    positive_fraction: float
+    fold_count: int
+    observation_count: int
+
+
+class ExplainabilityFoldScoreResponse(BaseModel):
+    fold: int
+    train_sample_count: int
+    validation_sample_count: int
+    train_malignant_count: int
+    train_benign_count: int
+    validation_malignant_count: int
+    validation_benign_count: int
+    baseline_roc_auc: float
+
+
+class ExplainabilityResponse(BaseModel):
+    method: str
+    scorer: str
+    selected_variant: str
+    selected_model: str
+    selected_calibration: str
+    selected_threshold: float
+    development_sample_count: int
+    cv_splits: int
+    permutation_repeats: int
+    feature_count: int
+    detail_row_count: int
+    holdout_used: bool
+    mean_fold_roc_auc: float
+    std_fold_roc_auc: float
+    features: list[ExplainabilityFeatureResponse]
+    fold_scores: list[ExplainabilityFoldScoreResponse]
+    limitations: list[str]
+    plot_endpoint: str
+    disclaimer: str
+
+
 class PredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

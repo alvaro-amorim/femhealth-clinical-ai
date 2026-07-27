@@ -11,7 +11,7 @@ FastAPI e Streamlit.
 Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
 FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
-notebook técnico consolidado.
+integrada à aplicação, e notebook técnico consolidado.
 
 ## Dataset
 
@@ -143,7 +143,13 @@ Endpoints:
 
 - `GET /health`;
 - `GET /model`;
+- `GET /explainability`;
+- `GET /explainability/plot`;
 - `POST /predict`.
+
+Os artefatos de explicabilidade são validados e carregados uma vez no
+`lifespan`. Os endpoints apenas apresentam resultados persistidos; nenhuma
+importância é recalculada por requisição.
 
 Execução local:
 
@@ -171,7 +177,11 @@ Páginas:
 
 - Apresentação;
 - Modelo e resultados;
+- Explicabilidade;
 - Simulador.
+
+A página de explicabilidade consome JSON e PNG pela FastAPI. O Streamlit não lê
+diretamente os arquivos em `reports/explainability`.
 
 A API deve ser iniciada primeiro.
 

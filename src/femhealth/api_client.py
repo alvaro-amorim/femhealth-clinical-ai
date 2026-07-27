@@ -10,6 +10,7 @@ import httpx
 
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_TIMEOUT_SECONDS = 5.0
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 class FemHealthApiError(RuntimeError):
@@ -51,6 +52,22 @@ def get_model_info(
 ) -> dict:
     """Get safe model metadata from the API."""
     return _request_json("GET", "/model", base_url=base_url, client=client)
+
+
+def get_explainability(
+    base_url: str | None = None,
+    client: httpx.Client | None = None,
+) -> dict:
+    """Get persisted explainability metadata from the API."""
+    return _request_json("GET", "/explainability", base_url=base_url, client=client)
+
+
+def get_explainability_plot(
+    base_url: str | None = None,
+    client: httpx.Client | None = None,
+) -> bytes:
+    """Get persisted explainability PNG bytes from the API."""
+    return _request_bytes("GET", "/explainability/plot", base_url=base_url, client=client)
 
 
 def request_prediction(
@@ -103,6 +120,41 @@ def _request_json(
         raise FemHealthApiError("A API retornou uma resposta inválida.")
 
     return payload
+
+
+def _request_bytes(
+    method: str,
+    path: str,
+    base_url: str | None = None,
+    client: httpx.Client | None = None,
+) -> bytes:
+    resolved_base_url = resolve_api_base_url() if base_url is None else base_url.rstrip("/")
+    timeout = resolve_api_timeout()
+    url = f"{resolved_base_url}{path}"
+
+    try:
+        if client is None:
+            with httpx.Client(timeout=timeout) as created_client:
+                response = _send_request(created_client, method, url, timeout, None)
+        else:
+            response = _send_request(client, method, url, timeout, None)
+
+        response.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise FemHealthApiError("A API demorou para responder.") from exc
+    except httpx.HTTPStatusError as exc:
+        raise _http_error(exc.response.status_code) from exc
+    except httpx.RequestError as exc:
+        raise FemHealthApiError(
+            "Não foi possível conectar à API. Verifique se o serviço FastAPI está em execução."
+        ) from exc
+
+    content_type = response.headers.get("content-type", "")
+    content = response.content
+    if "image/png" not in content_type or not content or not content.startswith(PNG_SIGNATURE):
+        raise FemHealthApiError("A API retornou uma resposta inválida.")
+
+    return content
 
 
 def _send_request(
