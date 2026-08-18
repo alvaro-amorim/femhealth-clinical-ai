@@ -207,7 +207,9 @@ http://127.0.0.1:8000/docs
 
 O endpoint `POST /predict` exige um objeto `features` com as 30 chaves
 canônicas. A ordem recebida é normalizada para a ordem canônica antes da
-inferência. O resultado é acadêmico e não possui validade clínica.
+inferência. O Swagger apresenta um exemplo completo com as 30 features para
+facilitar a conferência do contrato. O resultado é acadêmico e não possui
+validade clínica.
 
 ## Interface Streamlit
 

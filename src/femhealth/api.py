@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from femhealth.api_schemas import (
     ACADEMIC_DISCLAIMER,
+    PREDICTION_REQUEST_EXAMPLE,
     DemoCasesResponse,
     ExplainabilityResponse,
     HealthResponse,
@@ -24,6 +25,32 @@ from femhealth.model_artifact import load_model_artifact
 
 API_TITLE = "FemHealth Clinical AI"
 API_VERSION = "1.0.0"
+API_DESCRIPTION = (
+    "API de inferência acadêmica do FemHealth. O artefato final é carregado uma única "
+    "vez e não é treinado, recalibrado ou alterado pelas requisições."
+)
+OPENAPI_TAGS = [
+    {
+        "name": "Sistema",
+        "description": "Disponibilidade da API e do artefato final carregado.",
+    },
+    {
+        "name": "Modelo",
+        "description": "Configuração congelada do modelo acadêmico.",
+    },
+    {
+        "name": "Inferência",
+        "description": "Classificação acadêmica a partir do contrato canônico WDBC.",
+    },
+    {
+        "name": "Explicabilidade",
+        "description": "Resultados globais persistidos para interpretação acadêmica.",
+    },
+    {
+        "name": "Demonstração",
+        "description": "Casos congelados para apresentação acadêmica.",
+    },
+]
 
 
 def create_app(
@@ -69,10 +96,18 @@ def create_app(
     app = FastAPI(
         title=API_TITLE,
         version=API_VERSION,
+        description=API_DESCRIPTION,
+        openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
 
-    @app.get("/health", response_model=HealthResponse)
+    @app.get(
+        "/health",
+        response_model=HealthResponse,
+        tags=["Sistema"],
+        summary="Verificar estado da API",
+        description="Confirma se a aplicação está disponível e se o artefato final foi carregado.",
+    )
     def health(request: Request) -> HealthResponse:
         estimator, metadata = _get_loaded_artifact(request)
         return HealthResponse(
@@ -82,7 +117,13 @@ def create_app(
             selected_variant=metadata["selected_variant"],
         )
 
-    @app.get("/model", response_model=ModelInfoResponse)
+    @app.get(
+        "/model",
+        response_model=ModelInfoResponse,
+        tags=["Modelo"],
+        summary="Consultar modelo carregado",
+        description="Retorna informações da configuração congelada do modelo acadêmico.",
+    )
     def model_info(request: Request) -> ModelInfoResponse:
         _, metadata = _get_loaded_artifact(request)
         return ModelInfoResponse(
@@ -100,7 +141,29 @@ def create_app(
             disclaimer=ACADEMIC_DISCLAIMER,
         )
 
-    @app.post("/predict", response_model=PredictionResponse)
+    @app.post(
+        "/predict",
+        response_model=PredictionResponse,
+        tags=["Inferência"],
+        summary="Executar inferência",
+        description=(
+            "Recebe exatamente as 30 features canônicas do WDBC e retorna classificação "
+            "acadêmica e probabilidades produzidas pelo classificador."
+        ),
+        response_description="Classificação acadêmica e probabilidades do classificador.",
+        responses={
+            422: {
+                "description": "Payload fora do contrato de 30 features canônicas do WDBC."
+            }
+        },
+        openapi_extra={
+            "requestBody": {
+                "content": {
+                    "application/json": {"example": PREDICTION_REQUEST_EXAMPLE},
+                }
+            }
+        },
+    )
     def predict(request_body: PredictionRequest, request: Request) -> PredictionResponse:
         estimator, metadata = _get_loaded_artifact(request)
         feature_names = metadata["feature_names"]
@@ -121,7 +184,13 @@ def create_app(
             disclaimer=ACADEMIC_DISCLAIMER,
         )
 
-    @app.get("/explainability", response_model=ExplainabilityResponse)
+    @app.get(
+        "/explainability",
+        response_model=ExplainabilityResponse,
+        tags=["Explicabilidade"],
+        summary="Consultar explicabilidade global",
+        description="Retorna resultados globais persistidos; nenhuma importância é recalculada.",
+    )
     def explainability(request: Request) -> ExplainabilityResponse:
         payload = _get_loaded_explainability_payload(request)
         return ExplainabilityResponse(
@@ -130,12 +199,26 @@ def create_app(
             disclaimer=ACADEMIC_DISCLAIMER,
         )
 
-    @app.get("/explainability/plot")
+    @app.get(
+        "/explainability/plot",
+        tags=["Explicabilidade"],
+        summary="Obter gráfico de explicabilidade",
+        description="Retorna o gráfico PNG persistido da explicabilidade global.",
+        response_description="Gráfico PNG de explicabilidade global.",
+    )
     def explainability_plot(request: Request) -> Response:
         plot_bytes = _get_loaded_explainability_plot_bytes(request)
         return Response(content=plot_bytes, media_type="image/png")
 
-    @app.get("/demo-cases", response_model=DemoCasesResponse)
+    @app.get(
+        "/demo-cases",
+        response_model=DemoCasesResponse,
+        tags=["Demonstração"],
+        summary="Consultar casos de demonstração",
+        description=(
+            "Retorna casos congelados para demonstração acadêmica, sem executar inferência."
+        ),
+    )
     def demo_cases(request: Request) -> DemoCasesResponse:
         payload = _get_loaded_demo_cases_payload(request)
         return DemoCasesResponse(**payload, disclaimer=ACADEMIC_DISCLAIMER)

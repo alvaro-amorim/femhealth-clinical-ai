@@ -10,7 +10,12 @@ import femhealth.api as api_module
 import femhealth.api_schemas as api_schemas_module
 import femhealth.explainability_artifacts as explainability_artifacts_module
 from femhealth.api import create_app
-from femhealth.api_schemas import ACADEMIC_DISCLAIMER, PredictionRequest
+from femhealth.api_schemas import (
+    ACADEMIC_DISCLAIMER,
+    PREDICTION_FEATURE_EXAMPLE,
+    PREDICTION_REQUEST_EXAMPLE,
+    PredictionRequest,
+)
 from femhealth.data import WDBC_FEATURE_NAMES
 from femhealth.demo_cases_artifact import (
     DEMO_BENIGN_CASE_COUNT,
@@ -322,6 +327,44 @@ def test_model_returns_safe_metadata_fields(
     assert payload["feature_names"] == WDBC_FEATURE_NAMES
     assert payload["disclaimer"] == ACADEMIC_DISCLAIMER
     assert "estimator" not in payload
+
+
+def test_openapi_documents_predict_contract_and_endpoint_summaries() -> None:
+    openapi = create_app().openapi()
+    paths = openapi["paths"]
+    predict_operation = paths["/predict"]["post"]
+    request_example = predict_operation["requestBody"]["content"]["application/json"]["example"]
+    request_schema = openapi["components"]["schemas"]["PredictionRequest"]
+    response_schema = openapi["components"]["schemas"]["PredictionResponse"]
+
+    assert list(PREDICTION_FEATURE_EXAMPLE) == WDBC_FEATURE_NAMES
+    assert len(PREDICTION_FEATURE_EXAMPLE) == 30
+    assert request_example == PREDICTION_REQUEST_EXAMPLE
+    assert list(request_example["features"]) == WDBC_FEATURE_NAMES
+    assert request_schema["example"] == PREDICTION_REQUEST_EXAMPLE
+    assert request_schema["properties"]["features"]["examples"] == [
+        PREDICTION_FEATURE_EXAMPLE
+    ]
+    assert response_schema["example"]["threshold"] == SELECTED_THRESHOLD
+    assert response_schema["example"]["predicted_class"] == "benign"
+    assert predict_operation["summary"] == "Executar inferência"
+    assert predict_operation["tags"] == ["Inferência"]
+    assert "30 features canônicas" in predict_operation["description"]
+    assert response_schema["properties"]["probability_malignant"]["description"]
+    assert response_schema["properties"]["probability_benign"]["description"]
+    assert response_schema["properties"]["predicted_label"]["description"]
+    assert response_schema["properties"]["predicted_class"]["description"]
+    assert response_schema["properties"]["threshold"]["description"]
+    assert response_schema["properties"]["disclaimer"]["description"]
+
+    assert paths["/health"]["get"]["summary"] == "Verificar estado da API"
+    assert paths["/model"]["get"]["summary"] == "Consultar modelo carregado"
+    assert paths["/explainability"]["get"]["summary"] == "Consultar explicabilidade global"
+    assert (
+        paths["/explainability/plot"]["get"]["summary"]
+        == "Obter gráfico de explicabilidade"
+    )
+    assert paths["/demo-cases"]["get"]["summary"] == "Consultar casos de demonstração"
 
 
 def test_predict_reorders_features_and_calls_inference_once(
