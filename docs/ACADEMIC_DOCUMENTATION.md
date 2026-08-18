@@ -230,15 +230,15 @@ congelada, artefato versionado, API, interface e explicabilidade global.
 Os resultados são tecnicamente consistentes com o protocolo executado, mas não
 estabelecem validade clínica nem autorização de uso em contexto real.
 
-## 13. Entregáveis da apresentação
-
-- Vídeo de demonstração: [YouTube](https://youtu.be/ui-k60XdLRE).
-- Relatório técnico final em PDF: pendente de inclusão no repositório.
-
-## 14. Próximos passos acadêmicos
+## 13. Próximos passos
 
 Possíveis extensões futuras, fora do escopo da entrega atual:
 
 - validação externa como trabalho futuro;
 - estudo de dados adicionais;
 - visão computacional como extensão futura independente.
+
+## 14. Entregáveis da apresentação
+
+- Vídeo de demonstração: [YouTube](https://youtu.be/ui-k60XdLRE).
+- Relatório técnico final: [PDF](../Relatorio_TechChallenge.pdf).
