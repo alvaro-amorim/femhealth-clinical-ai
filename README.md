@@ -12,12 +12,14 @@ Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
 FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
 integrada à aplicação, casos de demonstração do holdout final materializados
-para vídeo, notebook técnico consolidado, documentação acadêmica consolidada e
-vídeo de demonstração publicado.
+para vídeo, notebook técnico consolidado, documentação acadêmica consolidada,
+relatório técnico final incluído no repositório e vídeo de demonstração
+publicado.
 
 ## Documentação
 
 - [Documentação acadêmica](docs/ACADEMIC_DOCUMENTATION.md);
+- [Relatório técnico final](Relatorio_TechChallenge.pdf);
 - [Model Card](docs/MODEL_CARD.md);
 - [Arquitetura](docs/ARCHITECTURE.md);
 - [Ética e uso responsável](docs/RESPONSIBLE_USE.md);
@@ -28,7 +30,7 @@ vídeo de demonstração publicado.
 ## Entregáveis da apresentação
 
 - Vídeo de demonstração: [YouTube](https://youtu.be/ui-k60XdLRE).
-- Relatório técnico final em PDF: pendente de inclusão no repositório.
+- Relatório técnico final: [PDF](Relatorio_TechChallenge.pdf).
 
 ## Dataset
 
