@@ -29,6 +29,12 @@ dataset atual é tabular e contém medidas numéricas já estruturadas.
 O dataset utilizado é o Breast Cancer Wisconsin Diagnostic, carregado
 exclusivamente por `sklearn.datasets.load_breast_cancer(as_frame=True)`.
 
+As 30 features tabulares do WDBC foram originalmente calculadas a partir de
+imagens microscópicas digitalizadas de material obtido por punção aspirativa por
+agulha fina (PAAF/FNA) de uma massa mamária. O FemHealth não realiza coleta,
+digitalização da lâmina, segmentação ou extração automática dessas medidas; sua
+entrada começa nas 30 features já estruturadas.
+
 Características comprovadas pelo contrato do projeto:
 
 | Item | Valor |
@@ -170,6 +176,10 @@ O fluxo geral é:
 
 dados e treinamento → artefatos congelados → FastAPI → Streamlit.
 
+A aquisição da amostra, a digitalização da lâmina e a extração das 30 features
+são etapas externas ao projeto. O escopo da aplicação começa nas features
+tabulares já estruturadas.
+
 A FastAPI carrega os artefatos no `lifespan`; o Streamlit consome a API por
 HTTP. A arquitetura completa está descrita em
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -220,14 +230,15 @@ congelada, artefato versionado, API, interface e explicabilidade global.
 Os resultados são tecnicamente consistentes com o protocolo executado, mas não
 estabelecem validade clínica nem autorização de uso em contexto real.
 
-## 13. Próximos passos
+## 13. Entregáveis da apresentação
 
-Possíveis próximos passos acadêmicos:
+- Vídeo de demonstração: [YouTube](https://youtu.be/ui-k60XdLRE).
+- Relatório técnico final em PDF: pendente de inclusão no repositório.
 
-- elaboração do relatório final em PDF;
-- gravação de vídeo demonstrativo;
+## 14. Próximos passos acadêmicos
+
+Possíveis extensões futuras, fora do escopo da entrega atual:
+
 - validação externa como trabalho futuro;
 - estudo de dados adicionais;
 - visão computacional como extensão futura independente.
-
-Esses itens não estão implementados nesta versão.
