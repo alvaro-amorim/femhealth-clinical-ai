@@ -12,7 +12,8 @@ Estado atual: benchmark e ajuste de hiperparâmetros concluídos, SVM calibrado
 selecionado, avaliação final do holdout concluída, artefato final persistido,
 FastAPI e interface Streamlit concluídas, explicabilidade global registrada e
 integrada à aplicação, casos de demonstração do holdout final materializados
-para vídeo, notebook técnico consolidado e documentação acadêmica consolidada.
+para vídeo, notebook técnico consolidado, documentação acadêmica consolidada e
+vídeo de demonstração publicado.
 
 ## Documentação
 
@@ -24,10 +25,21 @@ para vídeo, notebook técnico consolidado e documentação acadêmica consolida
 - [Notebook de EDA](notebooks/01_exploracao_wdbc.ipynb);
 - [Notebook técnico](notebooks/02_modelagem_e_explicabilidade.ipynb).
 
+## Entregáveis da apresentação
+
+- Vídeo de demonstração: [YouTube](https://youtu.be/ui-k60XdLRE).
+- Relatório técnico final em PDF: pendente de inclusão no repositório.
+
 ## Dataset
 
 O dataset utilizado e o Breast Cancer Wisconsin Diagnostic (WDBC), carregado
 exclusivamente por `sklearn.datasets.load_breast_cancer(as_frame=True)`.
+
+As 30 features tabulares do WDBC foram originalmente calculadas a partir de
+imagens microscópicas digitalizadas de material obtido por punção aspirativa por
+agulha fina (PAAF/FNA) de uma massa mamária. O FemHealth não realiza coleta,
+digitalização da lâmina, segmentação ou extração automática dessas medidas; o
+escopo do sistema começa nas 30 features já estruturadas.
 
 Contrato principal:
 
