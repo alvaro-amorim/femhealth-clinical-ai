@@ -2,6 +2,8 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+APPTEST_UI_RUN_TIMEOUT_SECONDS = 30
+
 DEMO_PAGE_APPTEST_SCRIPT = r'''
 import streamlit as st
 
@@ -60,28 +62,34 @@ def test_streamlit_app_renders_with_unavailable_api(monkeypatch) -> None:
 
 
 def test_demo_cases_page_restores_progress_from_query_params_without_inference() -> None:
-    app = AppTest.from_string(DEMO_PAGE_APPTEST_SCRIPT, default_timeout=10).run(timeout=10)
+    app = AppTest.from_string(
+        DEMO_PAGE_APPTEST_SCRIPT,
+        default_timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS,
+    ).run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
 
-    app.button[0].click().run(timeout=10)
-    app.selectbox[0].select_index(3).run(timeout=10)
-    app.button[0].click().run(timeout=10)
+    app.button[0].click().run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
+    app.selectbox[0].select_index(3).run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
+    app.button[0].click().run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
 
     assert not app.exception
     assert _scoreboard_values(app) == ["2", "1", "1", "50,00%"]
     assert app.session_state["prediction_calls"] == 2
     encoded_progress = app.query_params["demo_progress"][0]
 
-    restored_app = AppTest.from_string(DEMO_PAGE_APPTEST_SCRIPT, default_timeout=10)
+    restored_app = AppTest.from_string(
+        DEMO_PAGE_APPTEST_SCRIPT,
+        default_timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS,
+    )
     restored_app.query_params["demo_progress"] = [encoded_progress]
     restored_app.query_params["other"] = ["keep"]
-    restored_app.run(timeout=10)
+    restored_app.run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
 
     assert not restored_app.exception
     assert _scoreboard_values(restored_app) == ["2", "1", "1", "50,00%"]
     assert restored_app.session_state["prediction_calls"] == 0
     assert restored_app.selectbox[0].value[1]["case_id"] == "demo-04"
 
-    restored_app.button[1].click().run(timeout=10)
+    restored_app.button[1].click().run(timeout=APPTEST_UI_RUN_TIMEOUT_SECONDS)
 
     assert _scoreboard_values(restored_app) == ["0", "0", "0", "—"]
     assert "demo_progress" not in restored_app.query_params

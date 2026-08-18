@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from femhealth.data import WDBC_FEATURE_NAMES
 
@@ -13,6 +13,49 @@ ACADEMIC_DISCLAIMER = (
     "Resultado de classificação acadêmica. Não é diagnóstico médico e não "
     "substitui avaliação por profissional de saúde."
 )
+
+PREDICTION_FEATURE_EXAMPLE = {
+    "mean radius": 14.0,
+    "mean texture": 19.0,
+    "mean perimeter": 92.0,
+    "mean area": 650.0,
+    "mean smoothness": 0.10,
+    "mean compactness": 0.11,
+    "mean concavity": 0.09,
+    "mean concave points": 0.05,
+    "mean symmetry": 0.18,
+    "mean fractal dimension": 0.06,
+    "radius error": 0.50,
+    "texture error": 1.00,
+    "perimeter error": 3.00,
+    "area error": 40.0,
+    "smoothness error": 0.007,
+    "compactness error": 0.020,
+    "concavity error": 0.030,
+    "concave points error": 0.010,
+    "symmetry error": 0.020,
+    "fractal dimension error": 0.003,
+    "worst radius": 16.0,
+    "worst texture": 25.0,
+    "worst perimeter": 105.0,
+    "worst area": 850.0,
+    "worst smoothness": 0.14,
+    "worst compactness": 0.25,
+    "worst concavity": 0.28,
+    "worst concave points": 0.12,
+    "worst symmetry": 0.30,
+    "worst fractal dimension": 0.08,
+}
+
+PREDICTION_REQUEST_EXAMPLE = {"features": PREDICTION_FEATURE_EXAMPLE}
+PREDICTION_RESPONSE_EXAMPLE = {
+    "probability_malignant": 0.31,
+    "probability_benign": 0.69,
+    "predicted_label": 1,
+    "predicted_class": "benign",
+    "threshold": 0.51,
+    "disclaimer": ACADEMIC_DISCLAIMER,
+}
 
 
 class HealthResponse(BaseModel):
@@ -112,9 +155,18 @@ class DemoCasesResponse(BaseModel):
 
 
 class PredictionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": PREDICTION_REQUEST_EXAMPLE},
+    )
 
-    features: dict[str, float]
+    features: dict[str, float] = Field(
+        description=(
+            "Mapa com exatamente as 30 features canônicas do WDBC. Os nomes, valores "
+            "finitos e a presença de todas as chaves são validados antes da inferência."
+        ),
+        examples=[PREDICTION_FEATURE_EXAMPLE],
+    )
 
     @field_validator("features", mode="before")
     @classmethod
@@ -153,9 +205,23 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    probability_malignant: float
-    probability_benign: float
-    predicted_label: int
-    predicted_class: Literal["malignant", "benign"]
-    threshold: float
-    disclaimer: str
+    model_config = ConfigDict(json_schema_extra={"example": PREDICTION_RESPONSE_EXAMPLE})
+
+    probability_malignant: float = Field(
+        description="Probabilidade produzida pelo classificador para a classe malignant (0)."
+    )
+    probability_benign: float = Field(
+        description="Probabilidade produzida pelo classificador para a classe benign (1)."
+    )
+    predicted_label: int = Field(
+        description="Rótulo acadêmico previsto: 0 para malignant e 1 para benign."
+    )
+    predicted_class: Literal["malignant", "benign"] = Field(
+        description="Classe acadêmica prevista a partir do threshold congelado."
+    )
+    threshold: float = Field(
+        description="Threshold maligno congelado aplicado pelo classificador (0.51)."
+    )
+    disclaimer: str = Field(
+        description="Aviso de uso responsável: o projeto não possui validade clínica."
+    )
