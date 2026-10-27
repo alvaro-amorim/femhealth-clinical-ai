@@ -1,5 +1,16 @@
 # FemHealth Clinical AI
 
+## Leitura rápida
+
+Projeto acadêmico de classificação tabular, com foco em análise de dados, seleção e avaliação de modelos e disponibilização por API. Não possui validação para uso clínico.
+
+1. [Vídeo de demonstração](https://youtu.be/ui-k60XdLRE).
+2. [Model card: métricas, dados e limites](docs/MODEL_CARD.md).
+3. [Arquitetura](docs/ARCHITECTURE.md) e [uso de IA no desenvolvimento](docs/AI_USAGE.md).
+4. As instruções de instalação e validação estão nas seções **Instalar** e **Validar** abaixo. O ambiente do projeto usa Python 3.11.
+
+O resultado final descreve um holdout de 114 registros do WDBC; não representa desempenho comprovado em outras populações.
+
 Projeto acadêmico de classificação de padrões do Breast Cancer Wisconsin
 Diagnostic (WDBC), desenvolvido com apoio de aprendizado de máquina.
 
